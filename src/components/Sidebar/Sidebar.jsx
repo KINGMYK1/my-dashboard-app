@@ -9,15 +9,15 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
   // État pour gérer si la souris survole l'ensemble du sidebar (sur desktop, quand non étendu)
   const [isHovered, setIsHovered] = useState(false);
 
-  // MODIFICATION : Utilisation du hook de langue
+  // Utilisation du hook de langue
   const { translations } = useLanguage();
 
   // Liste des éléments du menu du sidebar avec leurs chemins
-  // MODIFICATION : Utilisation des traductions pour les labels
+  // MODIFICATION : Utilisation des chemins qui commencent par /dashboard
   const menuItems = [
-    { icon: <Home size={20} />, label: translations.home, path: '/' },
-    { icon: <Users size={20} />, label: translations.users, path: '/users' },
-    { icon: <Settings size={20} />, label: translations.settings, path: '/settings' },
+    { icon: <Home size={20} />, label: translations.home, path: '/dashboard/' }, // Chemin pour la page d'accueil du dashboard
+    { icon: <Users size={20} />, label: translations.users, path: '/dashboard/users' }, // Chemin pour la page utilisateurs
+    { icon: <Settings size={20} />, label: translations.settings, path: '/dashboard/settings' }, // Chemin pour la page paramètres (à ajouter dans AppRoutes si nécessaire)
   ];
 
   // Détermine si le sidebar doit être étendu visuellement.
@@ -128,11 +128,11 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
             transition-colors duration-300 // Durée de transition ajustée
             ${!shouldExpandVisual && 'justify-center w-auto'} // Centre et ajuste la largeur si rétracté visuellement
           `}
-          // MODIFICATION : Utilisation de la traduction pour le titre
+          // Utilisation de la traduction pour le titre
           title={!shouldExpandVisual ? translations.logout : ''} // Ajoute un tooltip si rétracté visuellement
         >
           <LogOut size={20} />
-          {/* MODIFICATION : Affiche le label uniquement si le sidebar est étendu visuellement */}
+          {/* Affiche le label uniquement si le sidebar est étendu visuellement */}
           {shouldExpandVisual && <span className="ml-4">{translations.logout}</span>}
         </button>
       </div>
