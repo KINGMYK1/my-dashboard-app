@@ -1,10 +1,35 @@
 import React from 'react';
-import { useLanguage } from '../../contexts/LanguageContext'; // Importez le hook de langue si déjà mis en place
+import { useLanguage } from '../../contexts/LanguageContext';
+import { useUsers } from '../../hooks/useUsers';
 
 // Page utilisateurs d'exemple
 const Users = () => {
   // Si vous avez déjà mis en place le contexte de langue, utilisez le hook
   const { translations } = useLanguage();
+  const { data: users, isLoading, isError, error } = useUsers();
+
+  // Éviter de recharger toute la page pendant le chargement
+  if (isLoading) {
+    return (
+      <div className="p-4">
+        <h1 className="text-2xl font-bold mb-4">{translations.users}</h1>
+        <div className="flex space-x-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="w-full h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-4">
+        <h1 className="text-2xl font-bold mb-4">{translations.users}</h1>
+        <div className="text-red-500">Erreur: {error.message}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -32,4 +57,5 @@ const Users = () => {
   );
 };
 
-export default Users;
+// Optimisation: Éviter les re-rendus inutiles
+export default React.memo(Users);

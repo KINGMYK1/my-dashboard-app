@@ -1,29 +1,58 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
+
+// Import synchrone de la page principale (affichée immédiatement)
 import HomePage from './pages/Home/Home';
-import UsersPage from './pages/Users/Users';
-// Importez d'autres pages ici si nécessaire
-import LoginPage from './components/Login/Login';
+
+// Chargement différé des autres pages pour optimiser les performances
+const UsersPage = lazy(() => import('./pages/Users/Users'));
+// const SettingsPage = lazy(() => import('./pages/Settings/Settings'));
+
+// Préchargez les modules de manière progressive
+const preloadRoutes = () => {
+  // Préchargement immédiat des routes principales
+  const timeout = setTimeout(() => {
+    // Préchargement après un court délai (laisser d'abord la page principale se rendre)
+    import('./pages/Users/Users');
+    // Décommentez quand Settings sera disponible
+    // import('./pages/Settings/Settings');
+  }, 2000);
+  
+  return () => clearTimeout(timeout);
+};
+
+// Composant de chargement amélioré
+const PageLoader = () => (
+  <div className="flex items-center justify-center h-16">
+    <div className="w-8 h-8 border-t-2 border-blue-500 border-solid rounded-full animate-spin"></div>
+  </div>
+);
 
 // Ce composant définit les routes internes au Dashboard
 const AppRoutes = () => {
+  const location = useLocation();
+  
+  // Préchargement des routes au montage initial
+  useEffect(() => {
+    return preloadRoutes();
+  }, []);
+
   return (
-    // MODIFICATION : Les routes ici sont relatives au chemin parent (/dashboard)
-    <Routes>
-      {/* Route pour la page d'accueil du dashboard (chemin relatif '/') */}
-      {/* Cela correspondra à /dashboard */}
-      <Route path="/" element={<HomePage />} />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* Route pour la page d'accueil du dashboard (chemin relatif '/') */}
+        <Route path="/" element={<HomePage />} />
 
-      {/* Route pour la page de gestion des utilisateurs (chemin relatif '/users') */}
-      {/* Cela correspondra à /dashboard/users */}
-      <Route path="/users" element={<UsersPage />} />
+        {/* Route pour la page de gestion des utilisateurs (chemin relatif '/users') */}
+        <Route path="/users" element={<UsersPage />} />
+        
+        {/* Route pour la page de paramètres */}
+        {/* <Route path="/settings" element={<SettingsPage />} /> */}
 
-      {/* Ajoutez d'autres routes internes au dashboard ici */}
-      {/* <Route path="/settings" element={<SettingsPage />} /> */}
-
-      {/* Optionnel: Rediriger toute autre route sous /dashboard/* vers la page d'accueil du dashboard */}
-      {/* <Route path="*" element={<Navigate to="/dashboard" replace />} /> */}
-    </Routes>
+        {/* Fallback vers la page d'accueil si l'URL ne correspond à aucune route */}
+        <Route path="*" element={<HomePage />} />
+      </Routes>
+    </Suspense>
   );
 };
 

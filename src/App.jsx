@@ -1,38 +1,66 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'; // MODIFICATION : Import de Routes, Route, Navigate
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard/Dashboard';
-import LoginPage from './components/Login/Login'; // MODIFICATION : Import de LoginPage
-import { LanguageProvider } from './contexts/LanguageContext'; // Assurez-vous que le chemin est correct
-import './index.css'; // Assurez-vous que votre fichier CSS principal (avec Tailwind et FA) est importé ici
+import LoginPage from './components/Login/Login';
+import TwoFactorPage from './components/TwoFactorPage/TwoFactorPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { AuthProvider } from './contexts/AuthContext';
+import SplashScreen from './components/SplashScreen/SplashScreen';
+import './index.css';
 
-function App() {
-  // Dans une vraie application, vous géreriez l'état d'authentification ici
-  // ou via un contexte/état global (par exemple, useState(false) initialement)
-  // Pour l'instant, nous allons simuler l'état d'authentification
-  // en vérifiant si l'utilisateur est sur la page de connexion ou non.
-  // Une approche plus robuste utiliserait un état d'utilisateur connecté.
+// Nouveau composant racine qui gère l'état de chargement initial
+function AppRoot() {
+  // État pour suivre si l'application est prête à être rendue
+  const [isAppReady, setIsAppReady] = useState(false);
+
+  useEffect(() => {
+    // Simuler un délai pour assurer le chargement des ressources
+    const timer = setTimeout(() => {
+      setIsAppReady(true);
+    }, 1000); // Donne au moins 1 seconde de chargement pour éviter les clignotements
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Si l'application n'est pas encore prête, afficher l'écran de chargement
+  if (!isAppReady) {
+    return <SplashScreen />;
+  }
 
   return (
-    // Enveloppez l'application avec BrowserRouter
     <BrowserRouter>
-      {/* LanguageProvider enveloppe les routes qui pourraient avoir besoin de traductions (principalement le Dashboard) */}
-      <LanguageProvider>
-        {/* MODIFICATION : Définition des routes principales */}
-        <Routes>
-          {/* Route pour la page de connexion à la racine */}
-          <Route path="/" element={<LoginPage />} />
-
-          {/* Route pour le tableau de bord et ses sous-routes */}
-          {/* Le '*' permet aux routes définies dans AppRoutes.jsx d'être imbriquées sous /dashboard */}
-          <Route path="/dashboard/*" element={<Dashboard />} />
-
-          {/* Optionnel: Rediriger toute autre route non définie vers la page de connexion ou le dashboard */}
-          {/* Ici, redirige tout le reste vers la page de connexion */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </LanguageProvider>
+      <AuthProvider>
+        <LanguageProvider>
+          <AppRoutes />
+        </LanguageProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }
 
-export default App;
+// Séparation des routes dans un composant distinct
+function AppRoutes() {
+  return (
+    <Routes>
+      {/* Route pour la page de connexion à la racine */}
+      <Route path="/" element={<LoginPage />} />
+      
+      {/* Route pour la vérification 2FA */}
+      <Route path="/verify-2fa" element={<TwoFactorPage />} />
+
+      {/* Route protégée pour le dashboard et ses sous-routes */}
+      <Route path="/dashboard/*" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
+
+      {/* Redirection pour les routes non définies */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+// Exporter le composant racine au lieu de App
+export default AppRoot;
