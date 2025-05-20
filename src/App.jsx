@@ -1,66 +1,101 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard/Dashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './components/Login/Login';
 import TwoFactorPage from './components/TwoFactorPage/TwoFactorPage';
-import ProtectedRoute from './components/ProtectedRoute';
+import SplashScreen from './components/SplashScreen/SplashScreen';
+import TransitionPage from './components/TransitionPage/TransitionPage';
+
 import { LanguageProvider } from './contexts/LanguageContext';
 import { AuthProvider } from './contexts/AuthContext';
-import SplashScreen from './components/SplashScreen/SplashScreen';
+import { NotificationProvider, useNotification } from './contexts/NotificationContext';
+import { initializeSessionNotification } from './api/apiService';
 import './index.css';
 
-// Nouveau composant racine qui gère l'état de chargement initial
-function AppRoot() {
-  // État pour suivre si l'application est prête à être rendue
-  const [isAppReady, setIsAppReady] = useState(false);
-
+// Composant intermédiaire pour initialiser les notifications
+const NotificationInitializer = ({ children }) => {
+  const { showSessionExpired } = useNotification();
+  
   useEffect(() => {
-    // Simuler un délai pour assurer le chargement des ressources
-    const timer = setTimeout(() => {
-      setIsAppReady(true);
-    }, 1000); // Donne au moins 1 seconde de chargement pour éviter les clignotements
+    // Initialiser la fonction de notification dans apiService
+    initializeSessionNotification(showSessionExpired);
+  }, [showSessionExpired]);
+  
+  return <>{children}</>;
+};
 
+// Wrapper pour le contrôle de rendu initial
+const AuthStateManager = ({ children }) => {
+  // Contrôle si l'application est prête à être rendue
+  const [appReady, setAppReady] = useState(false);
+  
+  useEffect(() => {
+    // Donner le temps aux contextes de s'initialiser
+    // Cela empêche les flashs lors du chargement initial
+    const timer = setTimeout(() => {
+      setAppReady(true);
+    }, 700);
+    
     return () => clearTimeout(timer);
   }, []);
-
-  // Si l'application n'est pas encore prête, afficher l'écran de chargement
-  if (!isAppReady) {
+  
+  // Afficher un splash screen jusqu'à ce que tout soit initialisé
+  if (!appReady) {
     return <SplashScreen />;
   }
+  
+  return children;
+};
+
+// Composant racine de l'application
+function App() {
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [transitionDestination, setTransitionDestination] = useState('');
+
+  const handleTransitionComplete = () => {
+    setIsTransitioning(false);
+  };
 
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <LanguageProvider>
-          <AppRoutes />
-        </LanguageProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <NotificationProvider>
+          <NotificationInitializer>
+            <AuthProvider>
+              <AuthStateManager>
+                {/* Afficher TransitionPage si en transition, sinon les routes normales */}
+                {isTransitioning ? (
+                  <TransitionPage 
+                    onTransitionComplete={handleTransitionComplete}
+                    destination={transitionDestination}
+                  />
+                ) : (
+                  <Routes>
+                    {/* Route pour la page de connexion à la racine */}
+                    <Route path="/" element={<LoginPage />} />
+
+                    {/* Route pour la vérification 2FA */}
+                    <Route path="/verify-2fa" element={<TwoFactorPage />} />
+
+                    {/* Route protégée pour le dashboard et ses sous-routes */}
+                    <Route path="/dashboard/*" element={
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    } />
+
+                    {/* Redirection pour les routes non définies */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                )}
+              </AuthStateManager>
+            </AuthProvider>
+          </NotificationInitializer>
+        </NotificationProvider>
+      </LanguageProvider>
     </BrowserRouter>
   );
 }
 
-// Séparation des routes dans un composant distinct
-function AppRoutes() {
-  return (
-    <Routes>
-      {/* Route pour la page de connexion à la racine */}
-      <Route path="/" element={<LoginPage />} />
-      
-      {/* Route pour la vérification 2FA */}
-      <Route path="/verify-2fa" element={<TwoFactorPage />} />
-
-      {/* Route protégée pour le dashboard et ses sous-routes */}
-      <Route path="/dashboard/*" element={
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
-      } />
-
-      {/* Redirection pour les routes non définies */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
-}
-
-// Exporter le composant racine au lieu de App
-export default AppRoot;
+export default App;

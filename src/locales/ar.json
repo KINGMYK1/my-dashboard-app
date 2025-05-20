@@ -26,5 +26,12 @@
   "userManagementDetails": "هنا ستضيف ميزات مثل عرض جدول المستخدمين، نماذج لإضافة/تعديل المستخدمين، إدارة الأدوار والصلاحيات، إلخ.",
   "switchToDarkMode": "التبديل إلى الوضع الداكن",
   "switchToLightMode": "التبديل إلى الوضع الفاتح",
-  "languageSelector": "اللغة"
+  "languageSelector": "اللغة",
+  "successTitle": "نجاح",
+  "errorTitle": "خطأ",
+  "warningTitle": "تنبيه",
+  "infoTitle": "معلومة",
+  "sessionExpiredTitle": "انتهت الجلسة",
+  "sessionExpiredMessage": "لقد انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
+  "closeNotification": "إغلاق"
 }

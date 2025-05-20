@@ -48,7 +48,9 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     }
     
     // Marquer comme navigation interne pour éviter les effets de chargement
-    setIsInternalNavigation(true);
+    if (setIsInternalNavigation) {
+      setIsInternalNavigation(true);
+    }
     
     // Utiliser navigate au lieu du comportement par défaut de <Link>
     navigate(path);
@@ -100,7 +102,9 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
                 to={item.path}
                 className={`
                   flex items-center py-2 px-3 rounded-lg
-                  ${window.location.pathname === item.path ? 'bg-blue-600' : 'hover:bg-gray-800'}
+                  ${location.pathname === item.path || 
+                    (location.pathname === '/dashboard' && item.path === '/dashboard') ? 
+                    'bg-blue-600' : 'hover:bg-gray-800'}
                   transition-colors duration-200
                   ${!shouldExpandVisual && 'justify-center'}
                 `}

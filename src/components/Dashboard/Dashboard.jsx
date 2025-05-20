@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../Header/Header';
 import Sidebar from '../Sidebar/Sidebar';
 import MainContent from '../MainContent/MainContent';
+import { isTokenExpired } from '../../utils/tokenUtils';
+import { useNotification } from '../../contexts/NotificationContext';
 
-// Composant principal du Dashboard
-export default function Dashboard() {
-  // État pour gérer l'expansion du sidebar
+const Dashboard = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const navigate = useNavigate();
+  const { showSessionExpired } = useNotification();
 
-  // Vérification de la taille de l'écran pour la responsive
   useEffect(() => {
     const checkScreenSize = () => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
-      // Rétracte le sidebar par défaut sur mobile
+      setSidebarExpanded(!mobile);
       if (mobile) {
         setSidebarExpanded(false);
       } else {
@@ -23,17 +25,36 @@ export default function Dashboard() {
       }
     };
 
-    // Appelle la fonction au montage et lors du redimensionnement
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
 
-    // Nettoyage de l'écouteur d'événement
     return () => {
       window.removeEventListener('resize', checkScreenSize);
     };
-  }, []); // Le tableau vide assure que cela ne s'exécute qu'une seule fois au montage
+  }, []);
 
-  // Fonction pour basculer l'état du sidebar
+  useEffect(() => {
+    // Vérifie l'expiration du token lors du chargement du composant
+    const token = localStorage.getItem('jwtToken');
+    if (!token || isTokenExpired(token)) {
+      localStorage.removeItem('jwtToken');
+      showSessionExpired();
+      navigate('/', { replace: true });
+    }
+
+    // Vérification périodique pendant que l'utilisateur est sur le tableau de bord
+    const tokenCheckInterval = setInterval(() => {
+      const currentToken = localStorage.getItem('jwtToken');
+      if (!currentToken || isTokenExpired(currentToken)) {
+        localStorage.removeItem('jwtToken');
+        showSessionExpired();
+        navigate('/', { replace: true });
+      }
+    }, 60000); // Vérifier chaque minute
+
+    return () => clearInterval(tokenCheckInterval);
+  }, [navigate, showSessionExpired]);
+
   const toggleSidebar = () => {
     setSidebarExpanded(!sidebarExpanded);
   };
@@ -51,7 +72,7 @@ export default function Dashboard() {
         {/* Le sidebar est rendu conditionnellement sur mobile pour qu'il apparaisse en superposition */}
         {/* MODIFICATION : Le sidebar est toujours rendu sur desktop, sa largeur est gérée par la grille */}
         {(!isMobile || (isMobile && sidebarExpanded)) && (
-           <Sidebar
+          <Sidebar
             expanded={sidebarExpanded}
             toggleSidebar={toggleSidebar}
             isMobile={isMobile}
@@ -65,4 +86,6 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
+};
+
+export default Dashboard;

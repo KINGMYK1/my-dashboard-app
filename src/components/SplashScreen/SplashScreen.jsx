@@ -1,8 +1,58 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-const SplashScreen = () => {
+const SplashScreen = ({ controlled = false, fadeOut = false }) => {
+  // État interne si non contrôlé
+  const [internalFadeOut, setInternalFadeOut] = useState(false);
+  // État pour contrôler l'affichage complet
+  const [isUnmounting, setIsUnmounting] = useState(false);
+  
+  // Utiliser fadeOut externe si contrôlé, sinon l'état interne
+  const shouldFadeOut = controlled ? fadeOut : internalFadeOut;
+
+  // Effet pour gestion automatique du fadeOut si non contrôlé
+  useEffect(() => {
+    if (!controlled) {
+      // Augmenter la durée du SplashScreen pour s'assurer que tout est bien chargé
+      const timer = setTimeout(() => {
+        setInternalFadeOut(true);
+        
+        // Commencer le démontage après la transition d'opacité
+        setTimeout(() => {
+          setIsUnmounting(true);
+        }, 700); // Correspond à la durée de transition
+      }, 1500); // Augmenté à 1.5s pour garantir un chargement complet
+
+      return () => clearTimeout(timer);
+    } else if (fadeOut) {
+      // Si contrôlé et fadeOut est true, programmer le démontage
+      const unmountTimer = setTimeout(() => {
+        setIsUnmounting(true);
+      }, 700); // Correspond à la durée de transition
+      
+      return () => clearTimeout(unmountTimer);
+    }
+  }, [controlled, fadeOut]);
+
+  // Si le composant est en cours de démontage et que nous voulons qu'il disparaisse
+  if (isUnmounting && shouldFadeOut) {
+    return null;
+  }
+
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-gray-900 to-gray-800 z-50">
+    <div 
+      className={`fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-gray-900 to-gray-800 z-[9999] transition-all duration-700 ${shouldFadeOut ? 'opacity-0' : 'opacity-100'}`}
+      style={{ 
+        pointerEvents: shouldFadeOut ? 'none' : 'auto',
+        transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        transitionDelay: shouldFadeOut ? '100ms' : '0ms',
+        // Garantir que le composant occupe vraiment tout l'écran
+        width: '100vw',
+        height: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0
+      }}
+    >
       <div className="w-24 h-24 mb-8" style={{ filter: 'drop-shadow(0 0 12px rgba(139, 92, 246, 0.8))' }}>
         {/* Logo SVG avec animation */}
         <svg className="w-full h-full animate-pulse" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">

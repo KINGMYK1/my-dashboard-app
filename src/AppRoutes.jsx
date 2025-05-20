@@ -1,32 +1,25 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 
-// Import synchrone de la page principale (affichée immédiatement)
+// Import synchrone de la page principale et des pages fréquemment utilisées
 import HomePage from './pages/Home/Home';
+import UsersPage from './pages/Users/Users'; // Chargement direct au lieu de lazy pour éviter le flash
 
-// Chargement différé des autres pages pour optimiser les performances
-const UsersPage = lazy(() => import('./pages/Users/Users'));
+// Le chargement paresseux est réservé aux pages moins fréquemment utilisées
 // const SettingsPage = lazy(() => import('./pages/Settings/Settings'));
 
 // Préchargez les modules de manière progressive
 const preloadRoutes = () => {
-  // Préchargement immédiat des routes principales
+  // Préchargement immédiat des routes secondaires
   const timeout = setTimeout(() => {
-    // Préchargement après un court délai (laisser d'abord la page principale se rendre)
-    import('./pages/Users/Users');
-    // Décommentez quand Settings sera disponible
-    // import('./pages/Settings/Settings');
-  }, 2000);
+    // import('./pages/Settings/Settings'); // Décommentez quand Settings sera disponible
+  }, 300);
   
   return () => clearTimeout(timeout);
 };
 
-// Composant de chargement amélioré
-const PageLoader = () => (
-  <div className="flex items-center justify-center h-16">
-    <div className="w-8 h-8 border-t-2 border-blue-500 border-solid rounded-full animate-spin"></div>
-  </div>
-);
+// Composant de chargement invisible - aucun flash
+const InvisibleLoader = () => null;
 
 // Ce composant définit les routes internes au Dashboard
 const AppRoutes = () => {
@@ -38,18 +31,11 @@ const AppRoutes = () => {
   }, []);
 
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<InvisibleLoader />}>
       <Routes>
-        {/* Route pour la page d'accueil du dashboard (chemin relatif '/') */}
         <Route path="/" element={<HomePage />} />
-
-        {/* Route pour la page de gestion des utilisateurs (chemin relatif '/users') */}
         <Route path="/users" element={<UsersPage />} />
-        
-        {/* Route pour la page de paramètres */}
         {/* <Route path="/settings" element={<SettingsPage />} /> */}
-
-        {/* Fallback vers la page d'accueil si l'URL ne correspond à aucune route */}
         <Route path="*" element={<HomePage />} />
       </Routes>
     </Suspense>

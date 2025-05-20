@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom'; // Supprimé useNavigate car la navigation est gérée par AuthContext
 import { User, Lock, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import SplashScreen from '../SplashScreen/SplashScreen';
+
 
 const LoginPage = () => {
   const [nomUtilisateur, setNomUtilisateur] = useState('');
@@ -10,16 +11,28 @@ const LoginPage = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const { user, loading, initialAuthCheckComplete, login, twoFactorRequired, tempAuthData } = useAuth();
-  const navigate = useNavigate();
+  // MODIFICATION : Utilise loadingInitial et initialAuthCheckComplete
+  const { user, loadingInitial, initialAuthCheckComplete, login, twoFactorRequired, tempAuthData } = useAuth();
+  // Suppression de useNavigate car la navigation est centralisée dans AuthContext
 
+  // Ce useEffect est maintenant plus simple, il réagit aux changements d'état d'authentification
+  // pour s'assurer que si l'état change *après* le chargement initial,
+  // et que l'utilisateur est connecté ou 2FA est requise, la page est redirigée.
+  // Cependant, la logique principale de redirection est dans AuthContext.
+  // Ce useEffect peut être considéré comme une sécurité ou une redondance.
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    } else if (twoFactorRequired && tempAuthData) {
-      navigate('/verify-2fa');
-    }
-  }, [user, twoFactorRequired, tempAuthData, navigate]);
+      // Si la vérification initiale est terminée
+      if (initialAuthCheckComplete) {
+          if (user) {
+              // Si l'utilisateur est connecté, il devrait être redirigé par AuthContext
+              // Si on arrive ici, c'est que quelque chose ne s'est pas passé comme prévu,
+              // mais AuthContext devrait déjà avoir navigué.
+          } else if (twoFactorRequired && tempAuthData) {
+              // Si 2FA requise, AuthContext devrait déjà avoir navigué
+          }
+      }
+  }, [user, twoFactorRequired, tempAuthData, initialAuthCheckComplete]);
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,7 +41,9 @@ const LoginPage = () => {
     setErrorMessage('');
 
     try {
+      // La fonction login du contexte gère l'appel à apiService.login et la navigation
       await login({ nomUtilisateur, motDePasse });
+      // La redirection est gérée dans le contexte après succès
     } catch (error) {
       console.error('Erreur de connexion dans le composant:', error.message);
       setErrorMessage(error.message || 'Une erreur est survenue lors de la connexion.');
@@ -36,17 +51,22 @@ const LoginPage = () => {
     }
   };
 
-  // Si la vérification d'authentification n'est pas terminée, afficher un écran de chargement
-  if (!initialAuthCheckComplete || loading) {
+  // MODIFICATION: Afficher le splash screen pour toute vérification
+  if (!initialAuthCheckComplete || loadingInitial) {
     return <SplashScreen />;
   }
 
-  // Si l'utilisateur est déjà connecté, rediriger directement vers le dashboard
+  // Ces redirections sont redondantes avec le useEffect de AuthContext, mais agissent comme un filet de sécurité
+  // et peuvent rendre le rendu plus rapide pour les cas simples.
   if (user) {
     return <Navigate to="/dashboard" replace />;
   }
+  if (twoFactorRequired && tempAuthData) {
+    return <Navigate to="/verify-2fa" replace />;
+  }
 
-  // Styles (conservés tels quels, mais l'utilisation de classes Tailwind est recommandée)
+
+  // Styles (conservés tels quels, mais l'utilisation de classes Tailwind est généralement préférée aux styles inline pour la cohérence)
   const styles = {
     body: {
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
@@ -79,13 +99,13 @@ const LoginPage = () => {
     }
   };
 
+
   return (
     <div className="w-full min-h-screen flex flex-col items-center justify-center" style={styles.body}>
       <div className="w-full max-w-md p-8" style={styles.loginContainer}>
         <div className="text-center mb-8">
           <div className="flex justify-center">
             <div style={styles.logoGlow}>
-              {/* Icône SVG conservée car elle fait partie du logo */}
               <svg className="w-24 h-24" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M256 48C141.1 48 48 141.1 48 256s93.1 208 208 208 208-93.1 208-208S370.9 48 256 48zm0 384c-97.2 0-176-78.8-176-176S158.8 80 256 80s176 78.8 176 176-78.8 176-176 176z" fill="#8b5cf6"/>
                 <path d="M192 192h-48v128h48V192zM368 192h-48v128h48V192zM288 240h-64v32h64v-32z" fill="#8b5cf6"/>
@@ -101,8 +121,7 @@ const LoginPage = () => {
             <label htmlFor="nomUtilisateur" className="block text-sm font-medium text-gray-300 mb-2">Nom d'utilisateur</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                {/* MODIFICATION : Icône Lucide React */}
-                <User size={20} className="text-purple-400" /> {/* size={20} pour une taille similaire */}
+                <User size={20} className="text-purple-400" />
               </div>
               <input
                 id="nomUtilisateur"
@@ -121,8 +140,7 @@ const LoginPage = () => {
             <label htmlFor="motDePasse" className="block text-sm font-medium text-gray-300 mb-2">Mot de passe</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                 {/* MODIFICATION : Icône Lucide React */}
-                <Lock size={20} className="text-purple-400" /> {/* size={20} pour une taille similaire */}
+                <Lock size={20} className="text-purple-400" />
               </div>
               <input
                 id="motDePasse"
@@ -152,8 +170,7 @@ const LoginPage = () => {
 
           {showError && (
             <div className="bg-red-900 bg-opacity-50 text-red-200 p-3 rounded-lg mb-6 text-sm">
-              {/* MODIFICATION : Icône Lucide React */}
-              <AlertCircle size={20} className="mr-2" /> {/* size={20} pour une taille similaire */}
+              <AlertCircle size={20} className="mr-2" />
               <span>{errorMessage}</span>
             </div>
           )}
@@ -162,10 +179,16 @@ const LoginPage = () => {
             type="submit"
             className="w-full py-3 px-4 rounded-lg font-medium text-white flex items-center justify-center"
             style={styles.loginBtn}
+            disabled={loadingInitial} // Désactiver le bouton pendant le chargement initial ou l'appel login
           >
-            <span>Connexion</span>
-             {/* MODIFICATION : Icône Lucide React */}
-            <LogIn size={20} className="ml-2" /> {/* size={20} pour une taille similaire */}
+            {loadingInitial ? (
+               <div className="w-5 h-5 border-t-2 border-white border-solid rounded-full animate-spin"></div>
+            ) : (
+               <>
+                 <span>Connexion</span>
+                 <LogIn size={20} className="ml-2" />
+               </>
+            )}
           </button>
         </form>
 

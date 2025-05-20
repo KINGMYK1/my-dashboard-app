@@ -9,24 +9,21 @@ const MainContent = () => {
   const location = useLocation();
   const { isInternalNavigation } = useAuth();
 
-  // Variants simplifiés pour une animation plus rapide
+  // Version simplifiée des variants pour éviter les flashs
   const pageVariants = {
-    initial: { opacity: isInternalNavigation ? 0.8 : 0 },
+    initial: { opacity: 1 }, // Commencer déjà visible
     in: { opacity: 1 },
-    out: { opacity: isInternalNavigation ? 0.8 : 0 }
+    out: { opacity: 1 }
   };
 
-  // Transitions ultra-rapides pour les navigations internes
+  // Transitions extrêmement rapides ou désactivées pour éviter les flashs
   const pageTransition = {
     type: "tween",
-    ease: "easeInOut",
-    duration: isInternalNavigation ? 0.1 : 0.2
+    duration: 0.01 // Pratiquement instantané
   };
 
   return (
-    // bg-gray-50 en mode clair, dark:bg-gray-800 en mode sombre
-    // text-gray-900 en mode clair, dark:text-gray-100 en mode sombre
-    <div className="overflow-y-auto p-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+    <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={location.pathname}
@@ -35,7 +32,7 @@ const MainContent = () => {
           exit="out"
           variants={pageVariants}
           transition={pageTransition}
-          className="min-h-[calc(100vh-6rem)]" // Assure une hauteur minimale
+          className="min-h-[calc(100vh-6rem)]"
         >
           <AppRoutes />
         </motion.div>

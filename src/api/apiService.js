@@ -1,4 +1,14 @@
 import axios from 'axios';
+import { isTokenExpired } from '../utils/tokenUtils';
+
+// Variable pour stocker la fonction showSessionExpired depuis le contexte
+// Elle sera définie dynamiquement après le montage du contexte
+let notifySessionExpired = null;
+
+// Fonction pour initialiser la notification
+export const initializeSessionNotification = (showExpiredFn) => {
+  notifySessionExpired = showExpiredFn;
+};
 
 // Définir l'URL de base de votre backend
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -29,11 +39,63 @@ api.interceptors.request.use(
     const isPublicEndpoint = publicEndpoints.some(endpoint => config.url.startsWith(endpoint));
 
     if (token && !isPublicEndpoint) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      // Vérifier si le token est expiré avant de l'ajouter aux en-têtes
+      if (isTokenExpired(token)) {
+        // Si le token est expiré, le supprimer
+        localStorage.removeItem('jwtToken');
+        
+        // Afficher la notification d'expiration de session si disponible
+        if (notifySessionExpired) {
+          notifySessionExpired();
+        }
+        
+        // Rediriger uniquement si nous ne sommes pas déjà sur la page de connexion ou de vérification 2FA
+        if (window.location.pathname !== '/' && window.location.pathname !== '/verify-2fa') {
+          window.location.href = '/';
+        }
+      } else {
+        // Sinon, ajouter le token valide aux en-têtes
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
     }
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Variable pour éviter les doubles redirections lors des erreurs 401
+let redirectionInProgress = false;
+
+// Intercepteur pour gérer les réponses et les erreurs globalement
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Si l'erreur est 401 (Unauthorized)
+    if (error.response && error.response.status === 401 && !redirectionInProgress) {
+      // Empêcher les redirections multiples
+      redirectionInProgress = true;
+      
+      // Déconnecter l'utilisateur
+      localStorage.removeItem('jwtToken');
+      
+      // Afficher la notification d'expiration de session si disponible
+      if (notifySessionExpired) {
+        notifySessionExpired();
+      }
+      
+      // Rediriger vers la page de connexion
+      if (window.location.pathname !== '/' && window.location.pathname !== '/verify-2fa') {
+        window.location.href = '/';
+        
+        // Réinitialiser le flag après la redirection
+        setTimeout(() => {
+          redirectionInProgress = false;
+        }, 1000);
+      }
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -48,19 +110,19 @@ const apiService = {
   verifyTwoFactor: (data) => api.post('/auth/verify-2fa', data),
   getUserProfile: () => api.get('/utilisateurs/profil'),
   
-  // AJOUT : Fonction pour récupérer la liste des utilisateurs
+  // Fonction pour récupérer la liste des utilisateurs
   getUsers: () => api.get('/utilisateurs'),
   
-  // AJOUT : Fonction pour récupérer un utilisateur spécifique
+  // Fonction pour récupérer un utilisateur spécifique
   getUser: (id) => api.get(`/utilisateurs/${id}`),
   
-  // AJOUT : Fonction pour créer un utilisateur
+  // Fonction pour créer un utilisateur
   createUser: (userData) => api.post('/utilisateurs', userData),
   
-  // AJOUT : Fonction pour mettre à jour un utilisateur
+  // Fonction pour mettre à jour un utilisateur
   updateUser: (id, userData) => api.put(`/utilisateurs/${id}`, userData),
   
-  // AJOUT : Fonction pour supprimer un utilisateur
+  // Fonction pour supprimer un utilisateur
   deleteUser: (id) => api.delete(`/utilisateurs/${id}`),
 };
 

@@ -1,25 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom'; // Supprimé useNavigate
 import { useAuth } from '../../contexts/AuthContext';
-// MODIFICATION : Import des icônes Lucide React
 import { Shield, CheckCircle, XCircle } from 'lucide-react';
+import SplashScreen from '../SplashScreen/SplashScreen';
 
 
 const TwoFactorPage = () => {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const navigate = useNavigate();
+  // MODIFICATION : Utilise loadingInitial et initialAuthCheckComplete
+  const { user, loadingInitial, initialAuthCheckComplete, twoFactorRequired, tempAuthData, verifyTwoFactor } = useAuth();
+  // Suppression de useNavigate
 
-  const { user, loading, twoFactorRequired, tempAuthData, verifyTwoFactor } = useAuth();
-
+  // Ce useEffect est simplifié, il réagit aux changements d'état d'authentification
+  // pour s'assurer que si l'état change *après* le chargement initial,
+  // et que l'utilisateur est connecté ou 2FA n'est plus requise, la page est redirigée.
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    } else if (!twoFactorRequired || !tempAuthData) {
-      navigate('/');
-    }
-  }, [user, twoFactorRequired, tempAuthData, navigate]);
+      // Si la vérification initiale est terminée
+      if (initialAuthCheckComplete) {
+          if (user) {
+              // Si l'utilisateur est connecté, il devrait être redirigé par AuthContext
+          } else if (!twoFactorRequired || !tempAuthData) {
+              // Si 2FA n'est plus requise ou données temporaires manquantes, AuthContext devrait déjà avoir navigué
+          }
+      }
+  }, [user, twoFactorRequired, tempAuthData, initialAuthCheckComplete]);
 
 
   const handleSubmit = async (e) => {
@@ -29,13 +35,30 @@ const TwoFactorPage = () => {
     setErrorMessage('');
 
     try {
+      // La fonction verifyTwoFactor du contexte gère l'appel API et la navigation
       await verifyTwoFactor(twoFactorCode);
+      // La redirection est gérée dans le contexte après succès
     } catch (error) {
       console.error('Erreur de vérification 2FA dans le composant:', error.message);
       setErrorMessage(error.message || 'Code 2FA incorrect. Veuillez réessayer.');
       setShowError(true);
     }
   };
+
+  // MODIFICATION : Afficher le splash screen si la vérification d'authentification initiale n'est pas terminée
+  if (!initialAuthCheckComplete) {
+    return <SplashScreen />;
+  }
+
+  // Ces redirections sont redondantes avec le useEffect de AuthContext, mais agissent comme un filet de sécurité
+  // et peuvent rendre le rendu plus rapide pour les cas simples.
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (!twoFactorRequired || !tempAuthData) {
+    return <Navigate to="/" replace />;
+  }
+
 
   // Styles (peut être adapté avec Tailwind)
   const styles = {
@@ -68,26 +91,15 @@ const TwoFactorPage = () => {
   };
 
 
-  if (loading) {
-      return <div>Chargement de l'état d'authentification...</div>;
-  }
-
-   if (!twoFactorRequired || !tempAuthData) {
-       return null;
-   }
-
-
   return (
      <div className="w-full min-h-screen flex flex-col items-center justify-center" style={styles.container}>
         <div className="w-full max-w-md p-8 text-center" style={styles.card}>
-            {/* MODIFICATION : Icône Lucide React */}
-            <Shield size={64} className="text-purple-400 mb-4 mx-auto" /> {/* size et mx-auto pour centrer */}
+            <Shield size={64} className="text-purple-400 mb-4 mx-auto" />
             <h1 className="text-2xl font-bold text-white mb-4">Vérification en deux étapes</h1>
             <p className="text-gray-300 mb-6">
                 Veuillez entrer le code de vérification de votre application d'authentification.
             </p>
 
-            {/* Afficher le QR code si disponible (première connexion avec 2FA) */}
             {tempAuthData.qrCodeUrl && (
                 <div className="mb-6 flex justify-center">
                     <img src={tempAuthData.qrCodeUrl} alt="QR Code 2FA" className="rounded-lg border border-gray-700" />
@@ -116,8 +128,7 @@ const TwoFactorPage = () => {
 
                  {showError && (
                     <div className="bg-red-900 bg-opacity-50 text-red-200 p-3 rounded-lg mb-6 text-sm">
-                      {/* MODIFICATION : Icône Lucide React */}
-                      <XCircle size={20} className="mr-2" /> {/* size={20} pour une taille similaire */}
+                      <XCircle size={20} className="mr-2" />
                       <span>{errorMessage}</span>
                     </div>
                   )}
@@ -126,10 +137,16 @@ const TwoFactorPage = () => {
                     type="submit"
                     className="w-full py-3 px-4 rounded-lg font-medium text-white flex items-center justify-center"
                     style={styles.verifyBtn}
+                    disabled={loadingInitial} // Désactiver le bouton pendant l'appel API verifyTwoFactor
                 >
-                    <span>Vérifier</span>
-                    {/* MODIFICATION : Icône Lucide React */}
-                    <CheckCircle size={20} className="ml-2" /> {/* size={20} pour une taille similaire */}
+                     {loadingInitial ? (
+                        <div className="w-5 h-5 border-t-2 border-white border-solid rounded-full animate-spin"></div>
+                     ) : (
+                        <>
+                          <span>Vérifier</span>
+                          <CheckCircle size={20} className="ml-2" />
+                        </>
+                     )}
                 </button>
             </form>
         </div>

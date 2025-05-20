@@ -26,5 +26,12 @@
   "userManagementDetails": "Ici, vous ajouteriez des fonctionnalités comme l'affichage d'une table d'utilisateurs, des formulaires pour ajouter/modifier des utilisateurs, la gestion des rôles et permissions, etc.",
   "switchToDarkMode": "Passer au thème sombre",
   "switchToLightMode": "Passer au thème clair",
-  "languageSelector": "Langue"
+  "languageSelector": "Langue",
+  "successTitle": "Succès",
+  "errorTitle": "Erreur",
+  "warningTitle": "Attention",
+  "infoTitle": "Information",
+  "sessionExpiredTitle": "Session expirée",
+  "sessionExpiredMessage": "Votre session a expiré. Veuillez vous reconnecter.",
+  "closeNotification": "Fermer"
 }

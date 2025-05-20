@@ -1,61 +1,84 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useUsers } from '../../hooks/useUsers';
 
 // Page utilisateurs d'exemple
 const Users = () => {
-  // Si vous avez déjà mis en place le contexte de langue, utilisez le hook
   const { translations } = useLanguage();
   const { data: users, isLoading, isError, error } = useUsers();
 
-  // Éviter de recharger toute la page pendant le chargement
-  if (isLoading) {
-    return (
-      <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">{translations.users}</h1>
-        <div className="flex space-x-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="w-full h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  // Exemple de données à afficher même pendant le chargement
+  const usersData = useMemo(() => {
+    if (users && Array.isArray(users)) {
+      return users;
+    }
+    
+    // Données fictives pendant le chargement pour éviter un flash de contenu vide
+    return [
+      {
+        id: 1,
+        username: "Chargement...",
+        firstName: "",
+        lastName: "",
+        email: "",
+        role: "",
+        isActive: true
+      }
+    ];
+  }, [users]);
 
-  if (isError) {
-    return (
-      <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">{translations.users}</h1>
-        <div className="text-red-500">Erreur: {error.message}</div>
-      </div>
-    );
-  }
-
+  // Rendre la même structure mais avec des placeholders si nécessaire
   return (
     <div className="space-y-6">
-      {/* MODIFICATION : Utilisation de la traduction pour le titre et ajout dark: */}
-      {/* text-gray-800 en mode clair, dark:text-gray-200 en mode sombre */}
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">{translations?.userManagement || 'User Management'}</h1>
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
+        {translations?.userManagement || 'Gestion des Utilisateurs'}
+      </h1>
 
-      {/* MODIFICATION : Ajout dark: pour le conteneur principal */}
-      {/* bg-white en mode clair, dark:bg-gray-700 en mode sombre */}
       <div className="bg-white dark:bg-gray-700 rounded-lg shadow p-6">
-        {/* MODIFICATION : Utilisation de la traduction pour le titre et ajout dark: */}
-        {/* text-gray-800 en mode clair, dark:text-gray-200 en mode sombre */}
-        <h2 className="text-lg font-medium mb-4 text-gray-800 dark:text-gray-200">{translations?.userList || 'User List'}</h2>
-        {/* Contenu à implémenter */}
-        {/* MODIFICATION : Utilisation des traductions et ajout dark: */}
-        {/* text-gray-700 en mode clair, dark:text-gray-300 en mode sombre */}
-        <p className="text-gray-700 dark:text-gray-300">{translations?.userManagementPlaceholder || 'User management interface to be implemented based on specific needs.'}</p>
-        {/* MODIFICATION : Utilisation des traductions et ajout dark: */}
-        {/* text-gray-600 en mode clair, dark:text-gray-400 en mode sombre */}
-        <p className="mt-4 text-gray-600 dark:text-gray-400">
-          {translations?.userManagementDetails || 'Here you would add features like displaying a user table, forms for adding/editing users, managing roles and permissions, etc.'}
-        </p>
+        <h2 className="text-lg font-medium mb-4 text-gray-800 dark:text-gray-200">
+          {translations?.userList || 'Liste des utilisateurs'}
+        </h2>
+
+        {/* Table des utilisateurs - toujours présente pour éviter les flashs */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+            <thead>
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nom d'utilisateur</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Prénom</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nom</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Statut</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-700 divide-y divide-gray-200 dark:divide-gray-600">
+              {usersData.map((user) => (
+                <tr key={user.id} className={`hover:bg-gray-50 dark:hover:bg-gray-600 ${isLoading ? 'opacity-50' : ''}`}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{isLoading ? "..." : user.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{user.username}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{isLoading ? "..." : user.firstName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{isLoading ? "..." : user.lastName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{isLoading ? "..." : user.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs ${user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {user.isActive ? 'Actif' : 'Inactif'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {isError && (
+            <div className="mt-4 p-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 rounded">
+              <p>Erreur: {error?.message || "Impossible de charger les utilisateurs"}</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-// Optimisation: Éviter les re-rendus inutiles
 export default React.memo(Users);
