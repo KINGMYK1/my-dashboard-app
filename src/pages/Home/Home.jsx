@@ -1,10 +1,64 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { 
+  Users, 
+  Shield, 
+  Key, 
+  Monitor, 
+  Activity,
+  TrendingUp,
+  Clock,
+  AlertCircle
+} from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext'; // Importez le hook de langue si déjà mis en place
+
+const StatCard = ({ icon: Icon, title, value, subtitle, color = 'purple' }) => {
+  const colorClasses = {
+    purple: 'from-purple-600 to-blue-600',
+    green: 'from-green-600 to-teal-600',
+    orange: 'from-orange-600 to-red-600',
+    blue: 'from-blue-600 to-indigo-600'
+  };
+
+  return (
+    <div 
+      className="p-6 rounded-xl border border-purple-400/20 hover:border-purple-400/40 transition-all duration-300 transform hover:scale-105"
+      style={{
+        background: 'rgba(30, 41, 59, 0.6)',
+        backdropFilter: 'blur(10px)'
+      }}
+    >
+      <div className="flex items-center space-x-4">
+        <div 
+          className={`p-3 rounded-lg bg-gradient-to-r ${colorClasses[color]} shadow-lg`}
+        >
+          <Icon size={24} className="text-white" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-gray-300 text-sm font-medium">{title}</h3>
+          <p className="text-white text-2xl font-bold">{value}</p>
+          {subtitle && (
+            <p className="text-gray-400 text-xs mt-1">{subtitle}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Page d'accueil d'exemple
 const Home = () => {
-  // Si vous avez déjà mis en place le contexte de langue, utilisez le hook
+  const { user, hasPermission } = useAuth();
+  const [currentTime, setCurrentTime] = useState(new Date());
   const { translations } = useLanguage();
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Données d'exemples pour le dashboard
   const stats = [
@@ -15,8 +69,186 @@ const Home = () => {
     { title: translations?.successRate || 'Success Rate', value: '89.4%', change: '+1.25%' }
   ];
 
+  const quickActions = [
+    {
+      title: 'Gestion Utilisateurs',
+      description: 'Créer et gérer les comptes utilisateurs',
+      icon: Users,
+      permission: 'MANAGE_USERS',
+      color: 'purple',
+      path: '/dashboard/users'
+    },
+    {
+      title: 'Gestion Rôles',
+      description: 'Configurer les rôles et permissions',
+      icon: Shield,
+      permission: 'MANAGE_ROLES',
+      color: 'green',
+      path: '/dashboard/roles'
+    },
+    {
+      title: 'Permissions',
+      description: 'Gérer les permissions système',
+      icon: Key,
+      permission: 'MANAGE_PERMISSIONS',
+      color: 'orange',
+      path: '/dashboard/permissions'
+    },
+    {
+      title: 'Postes Gaming',
+      description: 'Configurer les postes de jeu',
+      icon: Monitor,
+      permission: 'MANAGE_POSTES',
+      color: 'blue',
+      path: '/dashboard/postes'
+    }
+  ];
+
+  const availableActions = quickActions.filter(action => 
+    !action.permission || hasPermission(action.permission)
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
+      {/* En-tête de bienvenue */}
+      <div 
+        className="p-6 rounded-xl border border-purple-400/20"
+        style={{
+          background: 'rgba(30, 41, 59, 0.6)',
+          backdropFilter: 'blur(10px)'
+        }}
+      >
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Bienvenue, {user?.firstName} !
+            </h1>
+            <p className="text-gray-300">
+              Tableau de bord - Gaming Center Management
+            </p>
+            <p className="text-gray-400 text-sm mt-1">
+              Rôle: <span className="text-purple-400 font-medium">{user?.role?.name}</span>
+            </p>
+          </div>
+          <div className="mt-4 md:mt-0 text-right">
+            <div className="flex items-center space-x-2 text-gray-300">
+              <Clock size={16} />
+              <span className="text-sm">
+                {currentTime.toLocaleDateString('fr-FR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </span>
+            </div>
+            <p className="text-white text-xl font-mono">
+              {currentTime.toLocaleTimeString('fr-FR')}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Statistiques rapides */}
+      <div>
+        <h2 className="text-xl font-bold text-white mb-4">Aperçu du système</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatCard
+            icon={Users}
+            title="Utilisateurs Actifs"
+            value="12"
+            subtitle="2 nouveaux cette semaine"
+            color="purple"
+          />
+          <StatCard
+            icon={Shield}
+            title="Rôles Configurés"
+            value="3"
+            subtitle="Admin, Employé, Caissier"
+            color="green"
+          />
+          <StatCard
+            icon={Monitor}
+            title="Postes Gaming"
+            value="24"
+            subtitle="18 disponibles"
+            color="blue"
+          />
+          <StatCard
+            icon={Activity}
+            title="Sessions Actives"
+            value="8"
+            subtitle="66% d'occupation"
+            color="orange"
+          />
+        </div>
+      </div>
+
+      {/* Actions rapides */}
+      <div>
+        <h2 className="text-xl font-bold text-white mb-4">Actions rapides</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {availableActions.map((action, index) => (
+            <div
+              key={index}
+              className="p-6 rounded-xl border border-purple-400/20 hover:border-purple-400/40 transition-all duration-300 transform hover:scale-105 cursor-pointer group"
+              style={{
+                background: 'rgba(30, 41, 59, 0.6)',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              <div className="flex items-start space-x-4">
+                <div className={`p-3 rounded-lg bg-gradient-to-r ${
+                  action.color === 'purple' ? 'from-purple-600 to-blue-600' :
+                  action.color === 'green' ? 'from-green-600 to-teal-600' :
+                  action.color === 'orange' ? 'from-orange-600 to-red-600' :
+                  'from-blue-600 to-indigo-600'
+                } shadow-lg group-hover:shadow-xl transition-shadow duration-300`}>
+                  <action.icon size={24} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-white font-semibold group-hover:text-purple-300 transition-colors">
+                    {action.title}
+                  </h3>
+                  <p className="text-gray-400 text-sm mt-1">
+                    {action.description}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Notifications système */}
+      <div 
+        className="p-6 rounded-xl border border-orange-400/20"
+        style={{
+          background: 'rgba(30, 41, 59, 0.6)',
+          backdropFilter: 'blur(10px)'
+        }}
+      >
+        <div className="flex items-start space-x-3">
+          <AlertCircle className="text-orange-400 mt-1" size={20} />
+          <div>
+            <h3 className="text-white font-semibold">Notifications système</h3>
+            <p className="text-gray-300 text-sm mt-1">
+              Système opérationnel - Aucune alerte critique
+            </p>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-gray-400 text-xs">Base de données: Connectée</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-gray-400 text-xs">Services: Opérationnels</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* MODIFICATION : Utilisation de la traduction pour le titre et ajout dark: */}
       {/* text-gray-800 en mode clair, dark:text-gray-200 en mode sombre */}
       <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-200">{translations?.dashboard || 'Dashboard'}</h1>

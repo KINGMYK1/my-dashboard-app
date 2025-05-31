@@ -1,100 +1,131 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Dashboard from './components/Dashboard/Dashboard';
-import ProtectedRoute from './components/ProtectedRoute';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Contexts
+import { ThemeProvider } from './contexts/ThemeContext';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import { AuthProvider } from './contexts/AuthContext';
+
+// Components
+import ProtectedRoute from './components/common/ProtectedRoute';
 import LoginPage from './components/Login/Login';
 import TwoFactorPage from './components/TwoFactorPage/TwoFactorPage';
+import Dashboard from './components/Dashboard/Dashboard';
 import SplashScreen from './components/SplashScreen/SplashScreen';
-import TransitionPage from './components/TransitionPage/TransitionPage';
+import SessionExpiryAlert from './components/SessionExpiryAlert/SessionExpiryAlert';
 
-import { LanguageProvider } from './contexts/LanguageContext';
-import { AuthProvider } from './contexts/AuthContext';
-import { NotificationProvider, useNotification } from './contexts/NotificationContext';
-import { initializeSessionNotification } from './api/apiService';
-import './index.css';
+// Créer un client React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60000,
+      cacheTime: 300000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
-// Composant intermédiaire pour initialiser les notifications
-const NotificationInitializer = ({ children }) => {
-  const { showSessionExpired } = useNotification();
+// Composant pour gérer les événements de session expirée
+const SessionManager = ({ children }) => {
+  const [sessionExpired, setSessionExpired] = useState(false);
   
   useEffect(() => {
-    // Initialiser la fonction de notification dans apiService
-    initializeSessionNotification(showSessionExpired);
-  }, [showSessionExpired]);
-  
-  return <>{children}</>;
+    const handleSessionExpiry = () => {
+      setSessionExpired(true);
+      setTimeout(() => setSessionExpired(false), 5000);
+    };
+
+    window.addEventListener('auth:sessionExpired', handleSessionExpiry);
+    
+    return () => {
+      window.removeEventListener('auth:sessionExpired', handleSessionExpiry);
+    };
+  }, []);
+
+  return (
+    <>
+      {children}
+      <SessionExpiryAlert />
+      {sessionExpired && (
+        <div className="fixed top-4 right-4 z-50 bg-red-600 text-white p-4 rounded-lg shadow-lg">
+          <p className="font-semibold">Session expirée</p>
+          <p className="text-sm">Vous allez être redirigé vers la page de connexion...</p>
+        </div>
+      )}
+    </>
+  );
 };
 
-// Wrapper pour le contrôle de rendu initial
+// AuthStateManager simplifié
 const AuthStateManager = ({ children }) => {
-  // Contrôle si l'application est prête à être rendue
   const [appReady, setAppReady] = useState(false);
   
   useEffect(() => {
-    // Donner le temps aux contextes de s'initialiser
-    // Cela empêche les flashs lors du chargement initial
+    // Délai minimum pour éviter les flashs
     const timer = setTimeout(() => {
       setAppReady(true);
-    }, 700);
+    }, 500);
     
     return () => clearTimeout(timer);
   }, []);
   
-  // Afficher un splash screen jusqu'à ce que tout soit initialisé
   if (!appReady) {
-    return <SplashScreen />;
+    return <SplashScreen maxDuration={2000} />;
   }
   
-  return children;
+  return <>{children}</>;
 };
 
 // Composant racine de l'application
 function App() {
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [transitionDestination, setTransitionDestination] = useState('');
-
-  const handleTransitionComplete = () => {
-    setIsTransitioning(false);
-  };
-
   return (
-    <BrowserRouter>
-      <LanguageProvider>
-        <NotificationProvider>
-          <NotificationInitializer>
-            <AuthProvider>
-              <AuthStateManager>
-                {/* Afficher TransitionPage si en transition, sinon les routes normales */}
-                {isTransitioning ? (
-                  <TransitionPage 
-                    onTransitionComplete={handleTransitionComplete}
-                    destination={transitionDestination}
-                  />
-                ) : (
-                  <Routes>
-                    {/* Route pour la page de connexion à la racine */}
-                    <Route path="/" element={<LoginPage />} />
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <ThemeProvider>
+          <LanguageProvider>
+            <NotificationProvider>
+              <AuthProvider>
+                <SessionManager>
+                  <AuthStateManager>
+                    <Routes>
+                      {/* Route publique - Login */}
+                      <Route path="/" element={<LoginPage />} />
+                      
+                      {/* Route 2FA */}
+                      {/* <Route 
+                        path="/verify-2fa" 
+                        element={
+                          <ProtectedRoute require2FACompleted={false}>
+                            <TwoFactorPage />
+                          </ProtectedRoute>
+                        }
+                      /> */}
+                            <Route path="/verify-2fa" element={<TwoFactorPage />} />
 
-                    {/* Route pour la vérification 2FA */}
-                    <Route path="/verify-2fa" element={<TwoFactorPage />} />
-
-                    {/* Route protégée pour le dashboard et ses sous-routes */}
-                    <Route path="/dashboard/*" element={
-                      <ProtectedRoute>
-                        <Dashboard />
-                      </ProtectedRoute>
-                    } />
-
-                    {/* Redirection pour les routes non définies */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                )}
-              </AuthStateManager>
-            </AuthProvider>
-          </NotificationInitializer>
-        </NotificationProvider>
-      </LanguageProvider>
-    </BrowserRouter>
+                      {/* Routes protégées - Dashboard */}
+                      <Route 
+                        path="/dashboard/*" 
+                        element={
+                          <ProtectedRoute>
+                            <Dashboard />
+                          </ProtectedRoute>
+                        } 
+                      />
+                      
+                      {/* Redirection pour les routes non trouvées */}
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </AuthStateManager>
+                </SessionManager>
+              </AuthProvider>
+            </NotificationProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </Router>
+    </QueryClientProvider>
   );
 }
 

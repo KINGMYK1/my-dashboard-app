@@ -1,3 +1,54 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html, body {
+  background-color: #0f172a !important;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  height: 100%;
+}
+
+/* Conteneur racine */
+#root {
+  background-color: #0f172a;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Prévenir le flash blanc lors des transitions */
+* {
+  box-sizing: border-box;
+}
+
+/* Style pour tous les composants principaux */
+.route-container {
+  background-color: #0f172a;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Animations pour les transitions de page */
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.page-transition-enter {
+  animation: fadeIn 0.3s forwards;
+}
+
+.page-transition-exit {
+  animation: fadeOut 0.3s forwards;
+}
+
+/* Assurer que le thème sombre est appliqué partout */
+.dark {
+  color-scheme: dark;
+}
