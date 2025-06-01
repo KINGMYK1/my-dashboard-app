@@ -13,12 +13,12 @@ import Permissions from '../../pages/Permissions/Permissions';
 import Postes from '../../pages/Postes/Postes';
 import Settings from '../../pages/Settings/Settings';
 import Monitoring from '../../pages/Monitoring/Monitoring';
-
+import Notifications from '../../pages/Notifications/Notifications'
 const Dashboard = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const { user, hasPermission } = useAuth();
-  const { theme } = useTheme();
+  const { effectiveTheme } = useTheme(); // Utiliser effectiveTheme
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -55,27 +55,25 @@ const Dashboard = () => {
     }
   }, [user]);
 
-  // ✅ CORRECTION: Détection plus robuste du mode sombre
-  const currentTheme = theme?.mode || theme || 'dark';
-  const isDarkMode = currentTheme === 'dark';
+  // Détection du mode sombre/clair basé sur effectiveTheme
+  const isDarkMode = effectiveTheme === 'dark';
 
   console.log('🎨 [DASHBOARD] Debug thème:', {
-    theme,
-    currentTheme,
+    effectiveTheme,
     isDarkMode,
-    themeType: typeof theme
+    themeType: typeof effectiveTheme
   });
 
-  // ✅ AMÉLIORATION: Styles dynamiques harmonisés
+  // Styles dynamiques harmonisés pour le fond du dashboard
   const dashboardBackground = isDarkMode
     ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%)'
-    : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 25%, #cbd5e1 50%, #94a3b8 75%, #64748b 100%)';
+    : 'linear-gradient(135deg, #e0f2f7 0%, #e0f7fa 25%, #e0f9fd 50%, #e0faff 75%, #e0faff 100%)'; // Couleurs plus douces pour le thème clair
 
-  // ✅ NOUVEAU: Main content avec fond transparent - les pages gèrent leur propre fond
-  const mainContentBg = 'transparent'; // ✅ Laissez les pages gérer leur fond
-  const mainContentBackdropFilter = 'none'; // ✅ Pas de blur ici
+  // Le fond du main content sera transparent, les pages géreront leur propre fond
+  const mainContentBg = 'transparent'; 
+  const mainContentBackdropFilter = 'none'; 
 
-  // ✅ NOUVEAU: Styles pour les éléments décoratifs adaptés au thème
+  // Styles pour les éléments décoratifs adaptés au thème
   const decorativeElementsOpacity = isDarkMode ? 0.05 : 0.03;
   const gridOpacity = isDarkMode ? 0.05 : 0.02;
 
@@ -87,7 +85,7 @@ const Dashboard = () => {
         minHeight: '100vh'
       }}
     >
-      {/* ✅ AMÉLIORATION: Éléments décoratifs adaptés au thème */}
+      {/* Éléments décoratifs adaptés au thème */}
       <div 
         className="absolute inset-0 pointer-events-none transition-opacity duration-500"
         style={{
@@ -97,14 +95,14 @@ const Dashboard = () => {
             radial-gradient(circle at 90% 80%, #8b5cf6 0%, transparent 50%),
             radial-gradient(circle at 30% 60%, #ec4899 0%, transparent 50%)
           ` : `
-            radial-gradient(circle at 10% 20%, #3b82f6 0%, transparent 50%),
-            radial-gradient(circle at 90% 80%, #6366f1 0%, transparent 50%),
-            radial-gradient(circle at 30% 60%, #8b5cf6 0%, transparent 50%)
+            radial-gradient(circle at 10% 20%, #81d4fa 0%, transparent 50%), /* Bleu clair */
+            radial-gradient(circle at 90% 80%, #4fc3f7 0%, transparent 50%), /* Bleu ciel */
+            radial-gradient(circle at 30% 60%, #29b6f6 0%, transparent 50%)  /* Bleu plus vif */
           `
         }}
       />
       
-      {/* ✅ AMÉLIORATION: Grille de fond adaptée au thème */}
+      {/* Grille de fond adaptée au thème */}
       <div 
         className="absolute inset-0 pointer-events-none transition-opacity duration-500"
         style={{
@@ -113,14 +111,14 @@ const Dashboard = () => {
             linear-gradient(rgba(139, 92, 246, 0.1) 1px, transparent 1px),
             linear-gradient(90deg, rgba(139, 92, 246, 0.1) 1px, transparent 1px)
           ` : `
-            linear-gradient(rgba(59, 130, 246, 0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(59, 130, 246, 0.1) 1px, transparent 1px)
+            linear-gradient(rgba(0, 188, 212, 0.1) 1px, transparent 1px), /* Cyan clair */
+            linear-gradient(90deg, rgba(0, 188, 212, 0.1) 1px, transparent 1px)
           `,
           backgroundSize: '100px 100px'
         }}
       />
 
-      {/* Header */}
+      {/* Header (couleurs fixes, non affectées par le thème global) */}
       <Header 
         toggleSidebar={toggleSidebar}
         sidebarExpanded={sidebarExpanded}
@@ -129,14 +127,14 @@ const Dashboard = () => {
 
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden relative z-10">
-        {/* Sidebar */}
+        {/* Sidebar (couleurs fixes, non affectées par le thème global) */}
         <Sidebar
           expanded={sidebarExpanded}
           toggleSidebar={toggleSidebar}
           isMobile={isMobile}
         />
 
-        {/* ✅ CORRECTION: Main content transparent - padding minimal */}
+        {/* Main content transparent - padding minimal */}
         <main 
           className="flex-1 overflow-auto p-7 transition-all duration-500"
           style={{
@@ -175,6 +173,7 @@ const Dashboard = () => {
               
               {/* Settings - accessible à tous */}
               <Route path="/settings" element={<Settings />} />
+              <Route path="/notifications" element={<Notifications />} />
               
               {/* Redirection par défaut */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

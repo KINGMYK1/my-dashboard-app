@@ -37,7 +37,10 @@ export const ThemeProvider = ({ children }) => {
       setThemeState(savedTheme);
       applyTheme(savedTheme);
     } else {
-      applyTheme('dark'); // Thème par défaut
+      // Définir 'dark' comme thème par défaut si rien n'est trouvé
+      setThemeState('dark');
+      localStorage.setItem('preferredTheme', 'dark');
+      applyTheme('dark');
     }
   }, []);
 
@@ -51,8 +54,10 @@ export const ThemeProvider = ({ children }) => {
       }
     };
     
-    mediaQuery.addListener(handleSystemThemeChange);
-    return () => mediaQuery.removeListener(handleSystemThemeChange);
+    // Utilisation de addEventListener et removeEventListener pour les media queries
+    // C'est la méthode moderne et recommandée.
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
   }, [theme]);
 
   // Fonction pour appliquer le thème
@@ -112,18 +117,39 @@ export const ThemeProvider = ({ children }) => {
   const updateCSSVariables = (appliedTheme) => {
     const root = document.documentElement;
     
+    // Couleurs pour le thème sombre (existantes)
     if (appliedTheme === 'dark') {
-      root.style.setProperty('--background-primary', 'rgba(15, 23, 42, 0.95)');
-      root.style.setProperty('--background-secondary', 'rgba(30, 41, 59, 0.8)');
-      root.style.setProperty('--text-primary', '#ffffff');
-      root.style.setProperty('--text-secondary', '#94a3b8');
-      root.style.setProperty('--border-color', 'rgba(168, 85, 247, 0.2)');
-    } else {
-      root.style.setProperty('--background-primary', 'rgba(255, 255, 255, 0.95)');
-      root.style.setProperty('--background-secondary', 'rgba(248, 250, 252, 0.8)');
-      root.style.setProperty('--text-primary', '#1e293b');
-      root.style.setProperty('--text-secondary', '#64748b');
-      root.style.setProperty('--border-color', 'rgba(168, 85, 247, 0.3)');
+      root.style.setProperty('--background-primary', 'rgba(15, 23, 42, 0.95)'); // Presque noir
+      root.style.setProperty('--background-secondary', 'rgba(30, 41, 59, 0.8)'); // Gris foncé
+      root.style.setProperty('--background-card', 'rgba(30, 41, 59, 0.6)'); // Fond des cartes
+      root.style.setProperty('--background-input', 'rgba(30, 41, 59, 0.5)'); // Fond des inputs
+      root.style.setProperty('--text-primary', '#ffffff'); // Texte principal blanc
+      root.style.setProperty('--text-secondary', '#94a3b8'); // Texte secondaire gris bleu
+      root.style.setProperty('--border-color', 'rgba(168, 85, 247, 0.2)'); // Bordure violette légère
+      root.style.setProperty('--accent-color-primary', '#8b5cf6'); // Violet (pour les icônes, boutons)
+      root.style.setProperty('--accent-color-secondary', '#3b82f6'); // Bleu (pour les icônes, boutons)
+      root.style.setProperty('--success-color', '#22c55e'); // Vert
+      root.style.setProperty('--error-color', '#ef4444'); // Rouge
+      root.style.setProperty('--warning-color', '#f59e0b'); // Jaune
+      // Nouvelle variable pour les fonds de modales (sombre)
+      root.style.setProperty('--background-modal-card', 'rgba(30, 41, 59, 0.95)'); 
+    } 
+    // Nouvelles couleurs pour le thème clair (frais et doux)
+    else {
+      root.style.setProperty('--background-primary', 'rgba(240, 248, 255, 0.95)'); // Bleu très clair, presque blanc (AliceBlue)
+      root.style.setProperty('--background-secondary', 'rgba(224, 236, 255, 0.8)'); // Bleu plus doux
+      root.style.setProperty('--background-card', 'rgba(240, 255, 255, 0.95)'); // Fond des cartes blanc translucide
+      root.style.setProperty('--background-input', 'rgba(240, 255, 255, 0.95)'); // Fond des inputs blanc
+      root.style.setProperty('--text-primary', '#1a202c'); // Texte principal gris très foncé
+      root.style.setProperty('--text-secondary', '#4a5568'); // Texte secondaire gris moyen
+      root.style.setProperty('--border-color', 'rgba(59, 130, 246, 0.3)'); // Bordure bleue légère
+      root.style.setProperty('--accent-color-primary', '#3b82f6'); // Bleu (pour les icônes, boutons)
+      root.style.setProperty('--accent-color-secondary', '#6366f1'); // Indigo (pour les icônes, boutons)
+      root.style.setProperty('--success-color', '#10b981'); // Vert émeraude
+      root.style.setProperty('--error-color', '#dc2626'); // Rouge
+      root.style.setProperty('--warning-color', '#d97706'); // Orange
+      // Nouvelle variable pour les fonds de modales (blanc pur)
+      root.style.setProperty('--background-modal-card', 'rgba(255, 255, 255, 1)'); 
     }
   };
 
@@ -162,5 +188,3 @@ export const useTheme = () => {
   }
   return context;
 };
-
-export default ThemeContext;

@@ -12,12 +12,14 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext'; // Import useTheme
 import { useCreateUser, useUpdateUser } from '../../hooks/useUsers';
 import Portal from '../../components/Portal/Portal';
 
 const UserForm = ({ user, onClose, roles = [] }) => {
   const { translations } = useLanguage();
   const { user: currentUser, hasPermission } = useAuth();
+  const { effectiveTheme } = useTheme(); // Use effectiveTheme
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   
@@ -45,6 +47,26 @@ const UserForm = ({ user, onClose, roles = [] }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  const isDarkMode = effectiveTheme === 'dark';
+
+  // Styles dynamiques basés sur le thème
+  const getTextColorClass = (isPrimary) => isDarkMode ? (isPrimary ? 'text-white' : 'text-gray-300') : (isPrimary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]');
+  const getBorderColorClass = () => isDarkMode ? 'border-gray-600' : 'border-[var(--border-color)]';
+  const getInputBgClass = () => isDarkMode ? 'bg-gray-700/50' : 'bg-[var(--background-input)]';
+  const getInputTextClass = () => isDarkMode ? 'text-white' : 'text-[var(--text-primary)]';
+  const getInputPlaceholderClass = () => isDarkMode ? 'placeholder-gray-400' : 'placeholder-[var(--text-secondary)]';
+  const getInputFocusRingClass = () => isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]';
+  const getAccentColorClass = () => isDarkMode ? 'text-purple-400' : 'text-[var(--accent-color-primary)]';
+  const getButtonBgClass = () => isDarkMode ? 'bg-purple-600' : 'bg-[var(--accent-color-primary)]';
+  const getButtonHoverBgClass = () => isDarkMode ? 'hover:bg-purple-700' : 'hover:opacity-80';
+  const getErrorColorClass = () => isDarkMode ? 'text-red-400' : 'text-[var(--error-color)]';
+  const getErrorBgClass = () => isDarkMode ? 'bg-red-600/20' : 'bg-[var(--error-color)]20';
+  const getErrorBorderClass = () => isDarkMode ? 'border-red-500/50' : 'border-[var(--error-color)]';
+  const getWarningColorClass = () => isDarkMode ? 'text-yellow-400' : 'text-[var(--warning-color)]';
+  const getWarningBgClass = () => isDarkMode ? 'bg-yellow-600/20' : 'bg-[var(--warning-color)]20';
+  const getWarningBorderClass = () => isDarkMode ? 'border-yellow-500/50' : 'border-[var(--warning-color)]';
+
+
   // Initialiser le formulaire avec les données utilisateur
   useEffect(() => {
     if (isEdit && user) {
@@ -80,14 +102,14 @@ const UserForm = ({ user, onClose, roles = [] }) => {
     setErrors({});
   }, [user, isEdit]);
   
-  // Fonction pour vérifier la hiérarchie des rôles côté frontend
+  // Fonction pour vérifier la hiérarchie des rôles côté frontend (RÉTABLIE À L'ORIGINAL)
   const getRoleHierarchy = () => ({
     'Administrateur': 3,
     'Manager': 2,
     'Employé': 1
   });
   
-  // Déterminer quels rôles l'utilisateur courant peut attribuer
+  // Déterminer quels rôles l'utilisateur courant peut attribuer (RÉTABLIE À L'ORIGINAL)
   const canAssignRole = (roleName) => {
     const hierarchy = getRoleHierarchy();
     const userRoleName = currentUser?.role?.name || '';
@@ -264,7 +286,7 @@ const UserForm = ({ user, onClose, roles = [] }) => {
     if (!error) return null;
     
     return (
-      <p className="text-red-400 text-sm mt-1">{error}</p>
+      <p className={`mt-1 text-sm ${getErrorColorClass()}`}>{error}</p>
     );
   };
   
@@ -284,19 +306,19 @@ const UserForm = ({ user, onClose, roles = [] }) => {
     <Portal>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div 
-          className="rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-purple-400/20"
+          className={`rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border ${getBorderColorClass()}`}
           style={{
-            background: 'rgba(30, 41, 59, 0.95)',
+            background: 'var(--background-modal-card)', // Use new CSS variable
             backdropFilter: 'blur(10px)'
           }}
         >
           {/* Header */}
-          <div className="p-6 border-b border-gray-600">
+          <div className={`p-6 border-b ${getBorderColorClass()}`}>
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">{title}</h2>
+              <h2 className={`text-xl font-semibold ${getTextColorClass(true)}`}>{title}</h2>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-white transition-colors"
+                className={`transition-colors ${getTextColorClass(false)} hover:text-white`}
                 disabled={isSubmitting}
               >
                 <X size={20} />
@@ -308,7 +330,7 @@ const UserForm = ({ user, onClose, roles = [] }) => {
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             {/* Erreur générale */}
             {errors.general && (
-              <div className="p-3 bg-red-600/20 border border-red-500/50 rounded-md text-red-300">
+              <div className={`p-3 rounded-md border ${getErrorBgClass()} ${getErrorBorderClass()} ${getErrorColorClass()}`}>
                 {errors.general}
               </div>
             )}
@@ -317,19 +339,19 @@ const UserForm = ({ user, onClose, roles = [] }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Nom d'utilisateur */}
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-300">
+                <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                   {translations.username || "Nom d'utilisateur"} *
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <User size={18} className="text-gray-400" />
+                    <User size={18} className={`${getTextColorClass(false)}`} />
                   </div>
                   <input
                     type="text"
                     name="username"
                     value={formData.username}
                     onChange={handleChange}
-                    className={`pl-10 w-full rounded-md border ${errors.username ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    className={`pl-10 w-full rounded-md border ${errors.username ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} ${getInputPlaceholderClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                     placeholder={translations.usernameLabel || "Nom d'utilisateur"}
                     disabled={isEdit || isSubmitting}
                   />
@@ -339,19 +361,19 @@ const UserForm = ({ user, onClose, roles = [] }) => {
               
               {/* Email */}
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-300">
+                <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                   {translations.email || "Email"} *
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail size={18} className="text-gray-400" />
+                    <Mail size={18} className={`${getTextColorClass(false)}`} />
                   </div>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`pl-10 w-full rounded-md border ${errors.email ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    className={`pl-10 w-full rounded-md border ${errors.email ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} ${getInputPlaceholderClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                     placeholder={translations.emailLabel || "Email"}
                     disabled={isSubmitting}
                   />
@@ -363,7 +385,7 @@ const UserForm = ({ user, onClose, roles = [] }) => {
             {/* Prénom et Nom */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-300">
+                <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                   {translations.firstName || "Prénom"} *
                 </label>
                 <input
@@ -371,7 +393,7 @@ const UserForm = ({ user, onClose, roles = [] }) => {
                   name="firstName"
                   value={formData.firstName}
                   onChange={handleChange}
-                  className={`w-full rounded-md border ${errors.firstName ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  className={`w-full rounded-md border ${errors.firstName ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} ${getInputPlaceholderClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                   placeholder={translations.firstNameLabel || "Prénom"}
                   disabled={isSubmitting}
                 />
@@ -379,7 +401,7 @@ const UserForm = ({ user, onClose, roles = [] }) => {
               </div>
               
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-300">
+                <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                   {translations.lastName || "Nom"} *
                 </label>
                 <input
@@ -387,7 +409,7 @@ const UserForm = ({ user, onClose, roles = [] }) => {
                   name="lastName"
                   value={formData.lastName}
                   onChange={handleChange}
-                  className={`w-full rounded-md border ${errors.lastName ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  className={`w-full rounded-md border ${errors.lastName ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} ${getInputPlaceholderClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                   placeholder={translations.lastNameLabel || "Nom"}
                   disabled={isSubmitting}
                 />
@@ -398,19 +420,19 @@ const UserForm = ({ user, onClose, roles = [] }) => {
             {/* Téléphone et Adresse */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-300">
+                <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                   {translations.phone || "Téléphone"}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Phone size={18} className="text-gray-400" />
+                    <Phone size={18} className={`${getTextColorClass(false)}`} />
                   </div>
                   <input
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className={`pl-10 w-full rounded-md border ${errors.phone ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    className={`pl-10 w-full rounded-md border ${errors.phone ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} ${getInputPlaceholderClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                     placeholder={translations.phoneLabel || "Téléphone"}
                     disabled={isSubmitting}
                   />
@@ -419,19 +441,19 @@ const UserForm = ({ user, onClose, roles = [] }) => {
               </div>
               
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-300">
+                <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                   {translations.address || "Adresse"}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MapPin size={18} className="text-gray-400" />
+                    <MapPin size={18} className={`${getTextColorClass(false)}`} />
                   </div>
                   <input
                     type="text"
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
-                    className={`pl-10 w-full rounded-md border ${errors.address ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    className={`pl-10 w-full rounded-md border ${errors.address ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} ${getInputPlaceholderClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                     placeholder={translations.addressLabel || "Adresse"}
                     disabled={isSubmitting}
                   />
@@ -443,19 +465,19 @@ const UserForm = ({ user, onClose, roles = [] }) => {
             {/* Mots de passe */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-300">
+                <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                   {translations.password || "Mot de passe"} {!isEdit && '*'}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Key size={18} className="text-gray-400" />
+                    <Key size={18} className={`${getTextColorClass(false)}`} />
                   </div>
                   <input
                     type={showPassword ? "text" : "password"}
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={`pl-10 pr-10 w-full rounded-md border ${errors.password ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    className={`pl-10 pr-12 w-full rounded-md border ${errors.password ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} ${getInputPlaceholderClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                     placeholder={isEdit ? translations.passwordEdit || "Laisser vide pour ne pas changer" : translations.passwordCreate || "Mot de passe"}
                     disabled={isSubmitting}
                   />
@@ -465,26 +487,26 @@ const UserForm = ({ user, onClose, roles = [] }) => {
                     onClick={toggleShowPassword}
                     disabled={isSubmitting}
                   >
-                    {showPassword ? <EyeOff size={18} className="text-gray-400" /> : <Eye size={18} className="text-gray-400" />}
+                    {showPassword ? <EyeOff size={18} className={`${getTextColorClass(false)}`} /> : <Eye size={18} className={`${getTextColorClass(false)}`} />}
                   </button>
                 </div>
                 {renderFieldError('password')}
               </div>
               
               <div>
-                <label className="block mb-2 text-sm font-medium text-gray-300">
+                <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                   {translations.confirmPassword || "Confirmer le mot de passe"} {(!isEdit || formData.password) && '*'}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Key size={18} className="text-gray-400" />
+                    <Key size={18} className={`${getTextColorClass(false)}`} />
                   </div>
                   <input
                     type={showPassword ? "text" : "password"}
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`pl-10 w-full rounded-md border ${errors.confirmPassword ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                    className={`pl-10 w-full rounded-md border ${errors.confirmPassword ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} ${getInputPlaceholderClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                     placeholder={translations.confirmPasswordLabel || "Confirmer le mot de passe"}
                     disabled={isSubmitting}
                   />
@@ -495,28 +517,28 @@ const UserForm = ({ user, onClose, roles = [] }) => {
             
             {/* Sélection du rôle avec avertissement hiérarchique */}
             <div>
-              <label className="block mb-2 text-sm font-medium text-gray-300">
+              <label className={`block mb-2 text-sm font-medium ${getTextColorClass(false)}`}>
                 {translations.role || "Rôle"} *
               </label>
               {filteredRoles.length === 0 && (
-                <div className="mb-2 p-2 bg-yellow-600/20 border border-yellow-500/50 rounded text-yellow-300 text-sm">
+                <div className={`mb-2 p-2 rounded ${getWarningBgClass()} ${getWarningBorderClass()} ${getWarningColorClass()} text-sm`}>
                   Aucun rôle disponible pour votre niveau d'autorisation
                 </div>
               )}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Shield size={18} className="text-gray-400" />
+                  <Shield size={18} className={`${getTextColorClass(false)}`} />
                 </div>
                 <select
                   name="roleId"
                   value={formData.roleId}
                   onChange={handleChange}
-                  className={`pl-10 w-full rounded-md border ${errors.roleId ? 'border-red-500' : 'border-gray-600'} bg-gray-700/50 py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                  className={`pl-10 w-full rounded-md border ${errors.roleId ? getErrorBorderClass() : getBorderColorClass()} ${getInputBgClass()} py-2 px-3 ${getInputTextClass()} focus:outline-none focus:ring-2 ${getInputFocusRingClass()}`}
                   disabled={filteredRoles.length === 0 || isSubmitting}
                 >
-                  <option value="">{translations.selectRole || "Sélectionner un rôle"}</option>
+                  <option value="" className={isDarkMode ? 'bg-gray-800 text-white' : 'bg-[var(--background-primary)] text-[var(--text-primary)]'}>{translations.selectRole || "Sélectionner un rôle"}</option>
                   {filteredRoles.map(role => (
-                    <option key={role.id} value={role.id}>
+                    <option key={role.id} value={role.id} className={isDarkMode ? 'bg-gray-800 text-white' : 'bg-[var(--background-primary)] text-[var(--text-primary)]'}>
                       {translations.roleNames?.[role.name] || role.name}
                       {role.description && ` - ${role.description}`}
                     </option>
@@ -527,8 +549,8 @@ const UserForm = ({ user, onClose, roles = [] }) => {
               
               {/* Information hiérarchique */}
               {filteredRoles.length > 0 && (
-                <div className="mt-1 text-xs text-gray-400">
-                  Votre rôle "{currentUser?.role?.name}" vous permet de gérer : {filteredRoles.map(r => r.name).join(', ')}
+                <div className={`mt-1 text-xs ${getTextColorClass(false)}`}>
+                  Votre rôle "{currentUser?.role?.name}" vous permet de gérer : {filteredRoles.map(r => translations.roleNames?.[r.name] || r.name).join(', ')}
                 </div>
               )}
             </div>
@@ -542,10 +564,11 @@ const UserForm = ({ user, onClose, roles = [] }) => {
                   id="isActive"
                   checked={formData.isActive}
                   onChange={handleChange}
-                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 rounded bg-gray-700"
+                  className={`h-4 w-4 ${getAccentColorClass()} focus:ring-${isDarkMode ? 'purple' : 'var(--accent-color-primary)'} border-${isDarkMode ? 'gray-600' : 'var(--border-color)'} rounded ${getInputBgClass()}`}
                   disabled={isSubmitting}
+                  style={{ color: isDarkMode ? 'purple' : 'var(--accent-color-primary)' }}
                 />
-                <label htmlFor="isActive" className="ml-2 block text-sm text-gray-300">
+                <label htmlFor="isActive" className={`ml-2 block text-sm ${getTextColorClass(false)}`}>
                   {translations.isActive || "Compte actif"}
                 </label>
               </div>
@@ -557,21 +580,22 @@ const UserForm = ({ user, onClose, roles = [] }) => {
                   id="twoFactorEnabled"
                   checked={formData.twoFactorEnabled}
                   onChange={handleChange}
-                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-600 rounded bg-gray-700"
+                  className={`h-4 w-4 ${getAccentColorClass()} focus:ring-${isDarkMode ? 'purple' : 'var(--accent-color-primary)'} border-${isDarkMode ? 'gray-600' : 'var(--border-color)'} rounded ${getInputBgClass()}`}
                   disabled={isSubmitting}
+                  style={{ color: isDarkMode ? 'purple' : 'var(--accent-color-primary)' }}
                 />
-                <label htmlFor="twoFactorEnabled" className="ml-2 block text-sm text-gray-300">
+                <label htmlFor="twoFactorEnabled" className={`ml-2 block text-sm ${getTextColorClass(false)}`}>
                   {translations.twoFactorEnabled || "Authentification à deux facteurs"}
                 </label>
               </div>
             </div>
             
             {/* Boutons */}
-            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-600">
+            <div className={`flex justify-end space-x-3 pt-4 border-t ${getBorderColorClass()}`}>
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+                className={`px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-[var(--background-input)] text-[var(--text-secondary)] hover:opacity-80'}`}
                 disabled={isSubmitting}
               >
                 {translations.cancel || "Annuler"}
@@ -579,7 +603,8 @@ const UserForm = ({ user, onClose, roles = [] }) => {
               <button
                 type="submit"
                 disabled={isSubmitting || filteredRoles.length === 0}
-                className={`px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center transition-colors ${(isSubmitting || filteredRoles.length === 0) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className={`px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 flex items-center transition-colors ${getButtonBgClass()} ${getButtonHoverBgClass()} ${(isSubmitting || filteredRoles.length === 0) ? 'opacity-70 cursor-not-allowed' : ''}`}
+                style={{ '--tw-ring-color': isDarkMode ? 'purple' : 'var(--accent-color-primary)' }}
               >
                 {isSubmitting ? (
                   <>

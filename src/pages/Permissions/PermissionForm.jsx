@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Shield, Lock } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext'; // Import useTheme
 import permissionService from '../../services/permissionService';
+import { useNotification } from '../../contexts/NotificationContext'; // Import useNotification
 
-const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
+const PermissionForm = ({ permission, onClose }) => { // Removed onSuccess, onError as they are handled by useNotification
   const { translations } = useLanguage();
+  const { effectiveTheme } = useTheme(); // Use effectiveTheme
+  const { showSuccess, showError } = useNotification(); // Use notification hooks
+
   const isEdit = !!permission;
   const title = isEdit ? 
     (translations.editPermission || "Modifier la permission") : 
@@ -23,6 +28,29 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
   // État pour afficher les erreurs de validation
   const [validationErrors, setValidationErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isDarkMode = effectiveTheme === 'dark';
+
+  // Styles dynamiques basés sur le thème
+  const getTextColorClass = (isPrimary) => isDarkMode ? (isPrimary ? 'text-white' : 'text-gray-300') : (isPrimary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]');
+  const getBorderColorClass = () => isDarkMode ? 'border-gray-600' : 'border-[var(--border-color)]';
+  const getInputBgClass = () => isDarkMode ? 'bg-gray-700/50' : 'bg-[var(--background-input)]';
+  const getInputTextClass = () => isDarkMode ? 'text-white' : 'text-[var(--text-primary)]';
+  const getInputPlaceholderClass = () => isDarkMode ? 'placeholder-gray-400' : 'placeholder-[var(--text-secondary)]';
+  const getInputFocusRingClass = () => isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]';
+  const getAccentColorClass = () => isDarkMode ? 'text-purple-400' : 'text-[var(--accent-color-primary)]';
+  const getButtonBgClass = () => isDarkMode ? 'bg-purple-600' : 'bg-[var(--accent-color-primary)]';
+  const getButtonHoverBgClass = () => isDarkMode ? 'hover:bg-purple-700' : 'hover:opacity-80';
+  const getErrorColorClass = () => isDarkMode ? 'text-red-400' : 'text-[var(--error-color)]';
+  const getErrorBgClass = () => isDarkMode ? 'bg-red-600/20' : 'bg-[var(--error-color)]20';
+  const getErrorBorderClass = () => isDarkMode ? 'border-red-500/50' : 'border-[var(--error-color)]';
+  const getWarningColorClass = () => isDarkMode ? 'text-yellow-400' : 'text-[var(--warning-color)]';
+  const getWarningBgClass = () => isDarkMode ? 'bg-yellow-600/20' : 'bg-[var(--warning-color)]20';
+  const getWarningBorderClass = () => isDarkMode ? 'border-yellow-500/50' : 'border-[var(--warning-color)]';
+  const getInfoColorClass = () => isDarkMode ? 'text-blue-400' : 'text-[var(--accent-color-secondary)]';
+  const getInfoBgClass = () => isDarkMode ? 'bg-blue-600/10' : 'bg-[var(--accent-color-secondary)]10';
+  const getInfoBorderClass = () => isDarkMode ? 'border-blue-500/30' : 'border-[var(--accent-color-secondary)]30';
+
 
   // Initialiser le formulaire avec les données de la permission si en mode édition
   useEffect(() => {
@@ -85,7 +113,7 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
     
     // Vérifier si c'est une permission critique
     if (isCritical) {
-      onError && onError('Cette permission système ne peut pas être modifiée');
+      showError('Cette permission système ne peut pas être modifiée');
       return;
     }
     
@@ -115,7 +143,7 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
 
       if (response.success) {
         const action = isEdit ? 'modifiée' : 'créée';
-        onSuccess && onSuccess(`Permission "${dataToSubmit.name}" ${action} avec succès`);
+        showSuccess(`Permission "${dataToSubmit.name}" ${action} avec succès`);
         // Attendre un peu avant de fermer pour montrer le toast
         setTimeout(() => {
           onClose();
@@ -130,7 +158,7 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
       if (error.response?.data?.validationErrors) {
         setValidationErrors(error.response.data.validationErrors);
       } else {
-        onError && onError(error.message || `Erreur lors de la ${isEdit ? 'modification' : 'création'}`);
+        showError(error.message || `Erreur lors de la ${isEdit ? 'modification' : 'création'}`);
       }
     } finally {
       setIsSubmitting(false);
@@ -152,30 +180,30 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div 
-        className="rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-purple-400/20"
+        className={`rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto border ${getBorderColorClass()}`}
         style={{
-          background: 'rgba(30, 41, 59, 0.95)',
+          background: 'var(--background-modal-card)', // Use new CSS variable
           backdropFilter: 'blur(10px)'
         }}
       >
         {/* Header */}
-        <div className="p-6 border-b border-gray-600">
+        <div className={`p-6 border-b ${getBorderColorClass()}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Shield className="h-6 w-6 text-purple-400" />
+              <Shield className={`h-6 w-6 ${getAccentColorClass()}`} />
               <div>
-                <h2 className="text-xl font-semibold text-white">{title}</h2>
+                <h2 className={`text-xl font-semibold ${getTextColorClass(true)}`}>{title}</h2>
                 {isCritical && (
                   <div className="flex items-center space-x-1 mt-1">
-                    <Lock className="w-4 h-4 text-yellow-400" />
-                    <span className="text-sm text-yellow-400">Permission système protégée</span>
+                    <Lock className={`w-4 h-4 ${getWarningColorClass()}`} />
+                    <span className={`text-sm ${getWarningColorClass()}`}>Permission système protégée</span>
                   </div>
                 )}
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors"
+              className={`transition-colors ${getTextColorClass(false)} hover:text-white`}
               disabled={isSubmitting}
             >
               <X size={20} />
@@ -187,7 +215,7 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Avertissement pour permissions critiques */}
           {isCritical && (
-            <div className="p-3 bg-yellow-600/20 border border-yellow-500/50 rounded-md text-yellow-300">
+            <div className={`p-3 rounded-md border ${getWarningBgClass()} ${getWarningBorderClass()} ${getWarningColorClass()}`}>
               <div className="flex items-center space-x-2">
                 <Lock className="w-4 h-4" />
                 <span className="text-sm">
@@ -199,14 +227,14 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
 
           {/* Erreur générale */}
           {validationErrors.general && (
-            <div className="p-3 bg-red-600/20 border border-red-500/50 rounded-md text-red-300">
+            <div className={`p-3 rounded-md border ${getErrorBgClass()} ${getErrorBorderClass()} ${getErrorColorClass()}`}>
               {validationErrors.general}
             </div>
           )}
 
           {/* Nom de la permission */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium mb-2 text-gray-300">
+            <label htmlFor="name" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
               {translations.permissionName || 'Nom de la permission'} *
             </label>
             <input
@@ -216,25 +244,22 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
               value={formData.name}
               onChange={handleChange}
               disabled={isCritical || isSubmitting}
-              className={`w-full rounded-md border ${
-                validationErrors.name ? 'border-red-500' : 'border-gray-600'
-              } ${
-                isCritical ? 'bg-gray-800/50 text-gray-500' : 'bg-gray-700/50 text-white'
-              } py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 uppercase disabled:cursor-not-allowed`}
+              className={`w-full rounded-md border py-2 px-3 focus:outline-none focus:ring-2 ${getInputBgClass()} ${getInputTextClass()} ${getInputPlaceholderClass()} uppercase disabled:cursor-not-allowed
+                ${validationErrors.name ? getErrorBorderClass() : (isDarkMode ? 'border-gray-500' : getBorderColorClass())} ${getInputFocusRingClass()}`}
               placeholder="EX: USERS_VIEW"
               maxLength={50}
             />
             {validationErrors.name && (
-              <p className="mt-1 text-sm text-red-400">{validationErrors.name}</p>
+              <p className={`mt-1 text-sm ${getErrorColorClass()}`}>{validationErrors.name}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">
+            <p className={`mt-1 text-xs ${getTextColorClass(false)}`}>
               Format recommandé: RESOURCE_ACTION (ex: USERS_VIEW, POSTS_MANAGE)
             </p>
           </div>
 
           {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium mb-2 text-gray-300">
+            <label htmlFor="description" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
               {translations.description || 'Description'} *
             </label>
             <textarea
@@ -244,41 +269,38 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
               onChange={handleChange}
               disabled={isCritical || isSubmitting}
               rows={3}
-              className={`w-full rounded-md border ${
-                validationErrors.description ? 'border-red-500' : 'border-gray-600'
-              } ${
-                isCritical ? 'bg-gray-800/50 text-gray-500' : 'bg-gray-700/50 text-white'
-              } py-2 px-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:cursor-not-allowed resize-none`}
-              placeholder={translations.permissionDescriptionPlaceholder || "Description de la permission..."}
+              className={`w-full rounded-md border py-2 px-3 focus:outline-none focus:ring-2 ${getInputBgClass()} ${getInputTextClass()} ${getInputPlaceholderClass()} disabled:cursor-not-allowed resize-none
+                ${validationErrors.description ? getErrorBorderClass() : (isDarkMode ? 'border-gray-500' : getBorderColorClass())} ${getInputFocusRingClass()}`}placeholder={translations.permissionDescriptionPlaceholder || "Description de la permission..."}
+
               maxLength={255}
             />
             {validationErrors.description && (
-              <p className="mt-1 text-sm text-red-400">{validationErrors.description}</p>
+              <p className={`mt-1 text-sm ${getErrorColorClass()}`}>{validationErrors.description}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">
+            <p className={`mt-1 text-xs ${getTextColorClass(false)}`}>
               {formData.description.length}/255 caractères
             </p>
           </div>
 
           {/* Exemples d'utilisation */}
           {!isEdit && (
-            <div className="p-3 bg-blue-600/10 border border-blue-500/30 rounded-md">
-              <h4 className="text-sm font-medium text-blue-400 mb-2">Exemples de permissions :</h4>
-              <div className="text-xs text-gray-400 space-y-1">
-                <div>• <span className="text-blue-300">USERS_VIEW</span> - Voir les utilisateurs</div>
-                <div>• <span className="text-blue-300">POSTS_MANAGE</span> - Gérer les publications</div>
-                <div>• <span className="text-blue-300">REPORTS_EXPORT</span> - Exporter les rapports</div>
+            <div className={`p-3 rounded-md border ${getInfoBgClass()} ${getInfoBorderClass()}`}>
+              <h4 className={`text-sm font-medium ${getInfoColorClass()} mb-2`}>Exemples de permissions :</h4>
+              <div className={`text-xs ${getTextColorClass(false)} space-y-1`}>
+                <div>• <span className={`${getInfoColorClass()}`}>USERS_VIEW</span> - Voir les utilisateurs</div>
+                <div>• <span className={`${getInfoColorClass()}`}>POSTS_MANAGE</span> - Gérer les publications</div>
+                <div>• <span className={`${getInfoColorClass()}`}>REPORTS_EXPORT</span> - Exporter les rapports</div>
               </div>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-600">
+          <div className={`flex justify-end space-x-3 pt-4 border-t ${getBorderColorClass()}`}>
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-gray-300 bg-gray-700/50 hover:bg-gray-600/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-[var(--background-input)] text-[var(--text-secondary)] hover:opacity-80'}`}
             >
               {translations.cancel || 'Annuler'}
             </button>
@@ -287,12 +309,12 @@ const PermissionForm = ({ permission, onClose, onSuccess, onError }) => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`flex items-center space-x-2 px-4 py-2 ${getButtonBgClass()} ${getButtonHoverBgClass()} text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {isSubmitting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>{isEdit ? 'Modification...' : 'Création...'}</span>
+                    <span>{isEdit ? (translations.processingUpdate || 'Modification...') : (translations.processingCreate || 'Création...')}</span>
                   </>
                 ) : (
                   <>

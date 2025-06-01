@@ -306,6 +306,26 @@
   "logout": "Déconnexion",
   "notificationsHeader": "Notifications",
   "noNewNotifications": "Aucune nouvelle notification",
-  "profileSettings": "Paramètres "
-   
+  "profileSettings": "Paramètres ",
+  "sessionExpiringSoon": "Session expire bientôt",
+  "sessionExpiryWarning": "Votre session expire dans",
+ 
+  "sessionTerminatedTitle": "Session terminée",
+  "loginAgain": "Se reconnecter",
+  "dismiss": "Masquer",
+  "markAsRead": "Marquer comme lu",
+  "markAllAsRead": "Marquer tout comme lu",
+  "clearAll": "Tout effacer",
+  "notifications": "Notifications",
+  "noNotifications": "Aucune notification",
+ 
+  "unread": "Non lues",
+  "roleCreatedSuccess": "Rôle créé avec succès",
+  "roleUpdatedSuccess": "Rôle modifié avec succès",
+  "roleDeletedSuccess": "Rôle supprimé avec succès",
+  "roleDeleteConstraintError": "Impossible de supprimer ce rôle car il est utilisé par des utilisateurs",
+  "permissionsAssignedSuccess": "Permissions mises à jour avec succès",
+  "retryAttempt": "Tentative de reconnexion",
+ 
+  "systemTitle": "Système"
 }

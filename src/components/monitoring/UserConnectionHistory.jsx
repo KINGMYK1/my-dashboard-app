@@ -2,8 +2,8 @@ import React from 'react';
 import { useUserConnectionHistory } from '../../hooks/useMonitoring';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Spinner, Badge, Card, Button, Tabs, Tab } from '../ui';
-import { Globe, Clock, Monitor, Calendar, User, ArrowLeft } from 'lucide-react';
+import { Spinner, Badge, Card, Button } from '../ui';
+import { ArrowLeft, Calendar, Clock, Globe, Monitor } from 'lucide-react';
 
 const UserConnectionHistory = ({ userId, onBack }) => {
   const { data, isLoading, isError, error, refetch } = useUserConnectionHistory(userId);
@@ -21,7 +21,11 @@ const UserConnectionHistory = ({ userId, onBack }) => {
     );
   }
   
-  const { sessions = [], loginActivities = [] } = data?.data || {};
+  const sessions = data?.data || [];
+  
+  // Séparer les sessions actives et terminées
+  const activeSessions = sessions.filter(session => session.isActive);
+  const inactiveSessions = sessions.filter(session => !session.isActive);
   
   return (
     <div>
@@ -36,8 +40,13 @@ const UserConnectionHistory = ({ userId, onBack }) => {
         </h2>
       </div>
       
-      <Tabs>
-        <Tab label="Sessions">
+      {/* ✅ CORRECTION: Utilisation de tabs simples au lieu du composant Tabs manquant */}
+      <div className="space-y-6">
+        {/* Toutes les sessions */}
+        <div>
+          <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
+            Toutes les sessions ({sessions.length})
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sessions.length === 0 ? (
               <p className="text-gray-500 col-span-full">Aucune session trouvée pour cet utilisateur</p>
@@ -47,78 +56,94 @@ const UserConnectionHistory = ({ userId, onBack }) => {
               ))
             )}
           </div>
-        </Tab>
+        </div>
         
-        <Tab label="Activités de connexion">
-          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-            <table className="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-800">
-                <tr>
-                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-200">Date</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-gray-200">Action</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-gray-200">Statut</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-gray-200">IP</th>
-                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-gray-200">Description</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
-                {loginActivities.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="py-4 text-center text-gray-500">
-                      Aucune activité de connexion trouvée pour cet utilisateur
-                    </td>
-                  </tr>
-                ) : (
-                  loginActivities.map(activity => (
-                    <tr key={activity.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-500 dark:text-gray-400">
-                        <div className="font-medium">{format(new Date(activity.createdAt), 'dd/MM/yyyy')}</div>
-                        <div className="text-xs">{format(new Date(activity.createdAt), 'HH:mm:ss')}</div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
-                        <ActionBadge action={activity.action} />
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm">
-                        <StatusBadge status={activity.status} />
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
-                        {activity.ipAddress || '-'}
-                      </td>
-                      <td className="px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
-                        {activity.description || '-'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        {/* Sessions actives */}
+        {activeSessions.length > 0 && (
+          <div>
+            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
+              Sessions actives ({activeSessions.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeSessions.map(session => (
+                <SessionHistoryCard key={session.id} session={session} />
+              ))}
+            </div>
           </div>
-        </Tab>
-      </Tabs>
+        )}
+        
+        {/* Sessions terminées */}
+        {inactiveSessions.length > 0 && (
+          <div>
+            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">
+              Sessions terminées ({inactiveSessions.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {inactiveSessions.map(session => (
+                <SessionHistoryCard key={session.id} session={session} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// Composant de carte d'historique de session
+// ✅ CORRECTION: Composant de carte utilisant la durée calculée du backend
 const SessionHistoryCard = ({ session }) => {
-  const { createdAt, logoutDate, lastActivity, ipAddress, userAgent, ipChanged } = session;
+  const { 
+    id,
+    createdAt, 
+    logoutDate, 
+    logoutTime,
+    lastActivity, 
+    ipAddress, 
+    userAgent, 
+    ipChanged,
+    isActive,
+    logoutReason,
+    duration // ✅ AJOUT: Utilisation de la durée calculée par le backend
+  } = session;
   
-  // État de la session
-  const isActive = session.isActive;
-  
-  // Calcul de la durée de session
+  // ✅ CORRECTION: Utiliser la durée calculée par le backend
   const getDuration = () => {
+    if (duration?.formatted) {
+      return duration.formatted;
+    }
+    
+    // Fallback si le backend n'a pas calculé la durée
     if (!createdAt) return '-';
     
     const start = new Date(createdAt);
-    const end = logoutDate ? new Date(logoutDate) : isActive ? new Date() : new Date(lastActivity);
+    const end = logoutDate ? new Date(logoutDate) : 
+               logoutTime ? new Date(logoutTime) :
+               isActive ? new Date() : new Date(lastActivity);
     const durationMs = end - start;
     
-    // Convertir en heures, minutes, secondes
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
     
     return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+  
+  // Traduction des raisons de déconnexion
+  const getLogoutReasonLabel = (reason) => {
+    const reasons = {
+      'EXPLICIT': 'Déconnexion manuelle',
+      'TIMEOUT': 'Expiration (inactivité)',
+      'NEW_LOGIN': 'Nouvelle connexion',
+      'NEW_LOGIN_2FA': 'Nouvelle connexion (2FA)',
+      'ADMIN_LOGOUT': 'Déconnexion par admin',
+      'ADMIN_TERMINATED': 'Terminée par admin',
+      'USER_DELETED': 'Utilisateur supprimé',
+      'ACCOUNT_DISABLED': 'Compte désactivé',
+      'SECURITY_BREACH': 'Problème de sécurité',
+      'MAINTENANCE': 'Maintenance système',
+      'TWO_FACTOR_DISABLED': '2FA désactivé'
+    };
+    
+    return reasons[reason] || reason || 'Inconnue';
   };
   
   return (
@@ -126,7 +151,7 @@ const SessionHistoryCard = ({ session }) => {
       <div className="p-4">
         <div className="flex justify-between items-start mb-3">
           <div className="font-medium">
-            Session {session.id}
+            Session #{id}
             <Badge color={isActive ? 'green' : 'gray'} className="ml-2">
               {isActive ? 'Active' : 'Terminée'}
             </Badge>
@@ -139,16 +164,16 @@ const SessionHistoryCard = ({ session }) => {
             <span>Début: {format(new Date(createdAt), 'dd/MM/yyyy HH:mm', { locale: fr })}</span>
           </div>
           
-          {logoutDate && (
+          {(logoutDate || logoutTime) && (
             <div className="flex items-center mb-1">
               <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-              <span>Fin: {format(new Date(logoutDate), 'dd/MM/yyyy HH:mm', { locale: fr })}</span>
+              <span>Fin: {format(new Date(logoutDate || logoutTime), 'dd/MM/yyyy HH:mm', { locale: fr })}</span>
             </div>
           )}
           
           <div className="flex items-center mb-1">
             <Clock className="w-4 h-4 mr-2 text-gray-400" />
-            <span>Durée: {getDuration()}</span>
+            <span className="font-medium">Durée: {getDuration()}</span>
           </div>
           
           <div className="flex items-center">
@@ -164,54 +189,24 @@ const SessionHistoryCard = ({ session }) => {
           {userAgent && (
             <div className="flex items-center mt-1">
               <Monitor className="w-4 h-4 mr-2 text-gray-400" />
-              <span className="truncate">{userAgent}</span>
+              <span className="truncate" title={userAgent}>
+                {userAgent.length > 50 ? `${userAgent.substring(0, 50)}...` : userAgent}
+              </span>
+            </div>
+          )}
+          
+          {/* Raison de déconnexion */}
+          {!isActive && logoutReason && (
+            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Raison de fin: {getLogoutReasonLabel(logoutReason)}
+              </div>
             </div>
           )}
         </div>
       </div>
     </Card>
   );
-};
-
-// Composant pour afficher le type d'action avec une couleur appropriée
-const ActionBadge = ({ action }) => {
-  let color = 'gray';
-  
-  if (action === 'LOGIN') {
-    color = 'green';
-  } else if (action === 'LOGOUT' || action === 'SESSION_END') {
-    color = 'blue';
-  } else if (action === 'LOGIN_FAILED') {
-    color = 'red';
-  } else if (action === 'SESSION_START') {
-    color = 'purple';
-  }
-  
-  return <Badge color={color}>{action}</Badge>;
-};
-
-// Composant pour afficher le statut avec une couleur appropriée
-const StatusBadge = ({ status }) => {
-  let color;
-  
-  switch (status) {
-    case 'SUCCESS':
-      color = 'green';
-      break;
-    case 'FAILURE':
-      color = 'red';
-      break;
-    case 'WARNING':
-      color = 'yellow';
-      break;
-    case 'INFO':
-      color = 'blue';
-      break;
-    default:
-      color = 'gray';
-  }
-  
-  return <Badge color={color}>{status}</Badge>;
 };
 
 export default UserConnectionHistory;

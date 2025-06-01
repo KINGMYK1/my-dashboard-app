@@ -1,27 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Shield } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import roleService from '../../services/roleService';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useCreateRole, useUpdateRole } from '../../hooks/useRoles';
+import { useNotification } from '../../contexts/NotificationContext';
 
-const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
+const RoleForm = ({ role, permissions, onClose }) => {
   const { translations } = useLanguage();
+  const { showSuccess, showError } = useNotification();
+  const { effectiveTheme } = useTheme();
+  
   const isEdit = !!role;
   const title = isEdit ? 
-    (translations.editRole || "Modifier le rôle") : 
-    (translations.addRole || "Ajouter un rôle");
+    (translations.editRole) : 
+    (translations.addRole);
 
-  // État initial du formulaire
+  const createRoleMutation = useCreateRole();
+  const updateRoleMutation = useUpdateRole();
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     permissions: []
   });
 
-  // État pour afficher les erreurs de validation
   const [validationErrors, setValidationErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialiser le formulaire avec les données du rôle si en mode édition
+  const isDarkMode = effectiveTheme === 'dark';
+
+  // Dynamic styles based on theme
+  const getTextColorClass = (isPrimary) => isDarkMode ? (isPrimary ? 'text-white' : 'text-gray-300') : (isPrimary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]');
+  const getBorderColorClass = () => isDarkMode ? 'border-gray-600' : 'border-[var(--border-color)]';
+  const getInputBgClass = () => isDarkMode ? 'bg-gray-700/50' : 'bg-[var(--background-input)]';
+  const getInputTextClass = () => isDarkMode ? 'text-white' : 'text-[var(--text-primary)]';
+  const getInputPlaceholderClass = () => isDarkMode ? 'placeholder-gray-400' : 'placeholder-[var(--text-secondary)]';
+  const getInputFocusRingClass = () => isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]';
+  const getAccentColorClass = () => isDarkMode ? 'text-purple-400' : 'text-[var(--accent-color-primary)]';
+  const getButtonBgClass = () => isDarkMode ? 'bg-purple-600' : 'bg-[var(--accent-color-primary)]';
+  const getButtonHoverBgClass = () => isDarkMode ? 'hover:bg-purple-700' : 'hover:opacity-80';
+  const getErrorColorClass = () => isDarkMode ? 'text-red-400' : 'text-[var(--error-color)]';
+  const getErrorBgClass = () => isDarkMode ? 'bg-red-600/20' : 'bg-[var(--error-color)]20';
+  const getErrorBorderClass = () => isDarkMode ? 'border-red-500/50' : 'border-[var(--error-color)]';
+  const getPurpleAccentColorClass = () => isDarkMode ? 'text-purple-300' : 'text-[var(--accent-color-primary)]';
+  const getPurpleAccentBgClass = () => isDarkMode ? 'bg-purple-600/20' : 'bg-[var(--accent-color-primary)]20';
+
+
   useEffect(() => {
     if (isEdit && role) {
       setFormData({
@@ -30,7 +54,6 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
         permissions: role.permissions ? role.permissions.map(p => p.id) : []
       });
     } else {
-      // Réinitialiser pour un nouveau rôle
       setFormData({
         name: '',
         description: '',
@@ -40,7 +63,6 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
     setValidationErrors({});
   }, [isEdit, role]);
 
-  // Gérer les changements dans les champs de texte
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -48,7 +70,6 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
       [name]: value
     }));
     
-    // Effacer l'erreur de validation pour ce champ
     if (validationErrors[name]) {
       setValidationErrors(prev => ({
         ...prev,
@@ -57,7 +78,6 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
     }
   };
 
-  // Gérer les changements de permissions (cases à cocher)
   const handlePermissionToggle = (permissionId) => {
     setFormData(prev => {
       const currentIds = prev.permissions || [];
@@ -70,29 +90,25 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
     });
   };
 
-  // Valider le formulaire
   const validateForm = () => {
     const errors = {};
     
     if (!formData.name.trim()) {
-      errors.name = translations?.nameRequired || 'Le nom du rôle est requis';
+      errors.name = translations?.nameRequired;
     } else if (formData.name.length < 3) {
-      errors.name = translations?.nameTooShort || 'Le nom doit contenir au moins 3 caractères';
+      errors.name = translations?.nameTooShort;
     }
 
     if (!formData.description.trim()) {
-      errors.description = translations?.descriptionRequired || 'La description est requise';
+      errors.description = translations?.descriptionRequired;
     }
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // Soumettre le formulaire
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (isSubmitting) return;
     
     if (!validateForm()) {
       return;
@@ -107,47 +123,31 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
         permissions: formData.permissions
       };
 
-      console.log('📝 Données à soumettre:', dataToSubmit);
+      console.log('📝 Data to submit:', dataToSubmit);
 
-      let response;
-      
       if (isEdit) {
-        console.log(`✏️ [ROLES] Modification du rôle: ${role.name}`);
-        response = await roleService.updateRole(role.id, dataToSubmit);
+        console.log(`✏️ [ROLES] Updating role: ${role.name}`);
+        await updateRoleMutation.mutateAsync({ id: role.id, roleData: dataToSubmit });
       } else {
-        console.log(`➕ [ROLES] Création du rôle: ${dataToSubmit.name}`);
-        response = await roleService.createRole(dataToSubmit);
+        console.log(`➕ [ROLES] Creating role: ${dataToSubmit.name}`);
+        await createRoleMutation.mutateAsync(dataToSubmit);
       }
-
-      if (response.success) {
-        const action = isEdit ? 'modifié' : 'créé';
-        onSuccess && onSuccess(`Rôle "${dataToSubmit.name}" ${action} avec succès`);
-        // Attendre un peu avant de fermer pour montrer le toast
-        setTimeout(() => {
-          onClose();
-        }, 1000);
-      } else {
-        throw new Error(response.message || `Erreur lors de la ${isEdit ? 'modification' : 'création'}`);
-      }
-    } catch (error) {
-      console.error(`❌ [ROLES] Erreur ${isEdit ? 'modification' : 'création'}:`, error);
       
-      // Gestion des erreurs de validation côté serveur
+      onClose();
+
+    } catch (error) {
+      console.error(`❌ [ROLES] Error ${isEdit ? 'updating' : 'creating'} role:`, error);
       if (error.response?.data?.validationErrors) {
         setValidationErrors(error.response.data.validationErrors);
-      } else {
-        onError && onError(error.message || `Erreur lors de la ${isEdit ? 'modification' : 'création'}`);
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Grouper les permissions par catégorie
   const groupedPermissions = React.useMemo(() => {
     if (!permissions || permissions.length === 0) return {};
     
-    // Grouper par préfixe (avant le premier '_')
     return permissions.reduce((groups, permission) => {
       const prefix = permission.name.split('_')[0] || 'GENERAL';
       if (!groups[prefix]) {
@@ -158,7 +158,6 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
     }, {});
   }, [permissions]);
 
-  // Gestion de la fermeture avec Escape
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape' && !isSubmitting) {
@@ -173,22 +172,22 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div 
-        className="rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-purple-400/20"
+        className={`rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border ${getBorderColorClass()}`}
         style={{
-          background: 'rgba(30, 41, 59, 0.95)',
+          background: 'var(--background-modal-card)', // Use new CSS variable
           backdropFilter: 'blur(10px)'
         }}
       >
         {/* Header */}
-        <div className="p-6 border-b border-gray-600">
+        <div className={`p-6 border-b ${getBorderColorClass()}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Shield className="h-6 w-6 text-purple-400" />
-              <h2 className="text-xl font-semibold text-white">{title}</h2>
+              <Shield className={`h-6 w-6 ${getAccentColorClass()}`} />
+              <h2 className={`text-xl font-semibold ${getTextColorClass(true)}`}>{title}</h2>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors"
+              className={`transition-colors ${getTextColorClass(false)} hover:text-white`}
               disabled={isSubmitting}
             >
               <X size={20} />
@@ -198,17 +197,17 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
         
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Erreur générale */}
+          {/* General error */}
           {validationErrors.general && (
-            <div className="p-3 bg-red-600/20 border border-red-500/50 rounded-md text-red-300">
+            <div className={`p-3 rounded-md border ${getErrorBgClass()} ${getErrorBorderClass()} ${getErrorColorClass()}`}>
               {validationErrors.general}
             </div>
           )}
 
-          {/* Nom du rôle */}
+          {/* Role name */}
           <div>
-            <label htmlFor="name" className="block text-sm font-medium mb-2 text-gray-300">
-              {translations?.roleName || 'Nom du rôle'} *
+            <label htmlFor="name" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
+              {translations?.roleName} *
             </label>
             <input
               type="text"
@@ -216,21 +215,20 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`w-full rounded-md border ${
-                validationErrors.name ? 'border-red-500' : 'border-gray-600'
-              } bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
-              placeholder={translations?.roleNamePlaceholder || "Ex: Manager"}
+              className={`w-full rounded-md border py-2 px-3 focus:outline-none focus:ring-2 ${getInputBgClass()} ${getInputTextClass()} ${getInputPlaceholderClass()}
+                ${validationErrors.name ? getErrorBorderClass() : (isDarkMode ? 'border-gray-500' : getBorderColorClass())} ${getInputFocusRingClass()}`}
+              placeholder={translations?.roleNamePlaceholder}
               disabled={isSubmitting}
             />
             {validationErrors.name && (
-              <p className="mt-1 text-sm text-red-400">{validationErrors.name}</p>
+              <p className={`mt-1 text-sm ${getErrorColorClass()}`}>{validationErrors.name}</p>
             )}
           </div>
           
           {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium mb-2 text-gray-300">
-              {translations?.description || 'Description'} *
+            <label htmlFor="description" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
+              {translations?.description} *
             </label>
             <textarea
               id="description"
@@ -238,33 +236,32 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
               value={formData.description}
               onChange={handleChange}
               rows={3}
-              className={`w-full rounded-md border ${
-                validationErrors.description ? 'border-red-500' : 'border-gray-600'
-              } bg-gray-700/50 py-2 px-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500`}
-              placeholder={translations?.descriptionPlaceholder || "Description du rôle"}
+              className={`w-full rounded-md border py-2 px-3 focus:outline-none focus:ring-2 ${getInputBgClass()} ${getInputTextClass()} ${getInputPlaceholderClass()}
+                ${validationErrors.description ? getErrorBorderClass() : (isDarkMode ? 'border-gray-500' : getBorderColorClass())} ${getInputFocusRingClass()}`}
+              placeholder={translations?.descriptionPlaceholder}
               disabled={isSubmitting}
             />
             {validationErrors.description && (
-              <p className="mt-1 text-sm text-red-400">{validationErrors.description}</p>
+              <p className={`mt-1 text-sm ${getErrorColorClass()}`}>{validationErrors.description}</p>
             )}
           </div>
           
           {/* Permissions */}
           <div>
-            <label className="block text-sm font-medium mb-3 text-gray-300">
-              {translations?.permissions || 'Permissions'}
+            <label className={`block text-sm font-medium mb-3 ${getTextColorClass(false)}`}>
+              {translations?.permissions}
             </label>
             
             {!permissions || permissions.length === 0 ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <div className={`animate-spin rounded-full h-8 w-8 border-b-2 ${isDarkMode ? 'border-purple-600' : 'border-[var(--accent-color-primary)]'}`}></div>
               </div>
             ) : (
-              <div className="max-h-80 overflow-y-auto border border-gray-600 rounded-md p-4 bg-gray-700/30">
+              <div className={`max-h-80 overflow-y-auto border ${getBorderColorClass()} rounded-md p-4 ${getInputBgClass()}`}>
                 {Object.entries(groupedPermissions).map(([group, perms]) => (
                   <div key={group} className="mb-6 last:mb-0">
-                    <h3 className="text-sm font-semibold mb-3 text-purple-300 border-b border-gray-600 pb-2">
-                      {group}
+                    <h3 className={`text-sm font-semibold mb-3 border-b pb-2 ${getPurpleAccentColorClass()} ${getBorderColorClass()}`}>
+                      {translations.permissionCategories?.[group.toLowerCase()] || group}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {perms.map(permission => (
@@ -275,15 +272,21 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
                             checked={formData.permissions.includes(permission.id)}
                             onChange={() => handlePermissionToggle(permission.id)}
                             disabled={isSubmitting}
-                            className="mt-1 h-4 w-4 text-purple-600 rounded border-gray-600 focus:ring-purple-500 bg-gray-700"
+                            className={`mt-1 h-4 w-4 rounded border ${isDarkMode ? 'border-gray-500' : getBorderColorClass()} ${getInputBgClass()} focus:ring-2 ${getInputFocusRingClass()}`}
+                            style={{ 
+                              color: isDarkMode ? 'purple' : 'var(--accent-color-primary)', 
+                              '--tw-ring-color': isDarkMode ? 'purple' : 'var(--accent-color-primary)' 
+                            }}
                           />
                           <label 
                             htmlFor={`permission-${permission.id}`}
-                            className="text-sm text-gray-300 cursor-pointer flex-1"
+                            className={`text-sm cursor-pointer flex-1 ${getTextColorClass(false)}`}
                           >
-                            <div className="font-medium">{permission.name}</div>
+                            <div className={`font-medium ${getTextColorClass(true)}`}>
+                              {translations.permissionNames?.[permission.name] || permission.name}
+                            </div>
                             {permission.description && (
-                              <div className="text-xs text-gray-400 mt-1">
+                              <div className={`text-xs mt-1 ${getTextColorClass(false)}`}>
                                 {permission.description}
                               </div>
                             )}
@@ -295,33 +298,34 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
                 ))}
                 
                 {Object.keys(groupedPermissions).length === 0 && (
-                  <p className="text-center text-gray-400 py-4">
-                    {translations?.noPermissionsAvailable || 'Aucune permission disponible'}
+                  <p className={`text-center py-4 ${getTextColorClass(false)}`}>
+                    {translations?.noPermissionsAvailable}
                   </p>
                 )}
               </div>
             )}
             
-            {/* Compteur de permissions sélectionnées */}
-            <div className="mt-2 text-sm text-gray-400">
-              {formData.permissions.length} {translations?.permissionsSelected || 'permission(s) sélectionnée(s)'}
+            {/* Selected permissions count */}
+            <div className={`mt-2 text-sm ${getTextColorClass(false)}`}>
+              {formData.permissions.length} {translations?.permissionsSelected}
             </div>
           </div>
           
           {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-600">
+          <div className={`flex justify-end space-x-3 pt-4 border-t ${getBorderColorClass()}`}>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-700 text-gray-300 rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+              className={`px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isDarkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-[var(--background-input)] text-[var(--text-secondary)] hover:opacity-80'}`}
               disabled={isSubmitting}
             >
-              {translations?.cancel || 'Annuler'}
+              {translations?.cancel}
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 flex items-center space-x-2 transition-colors ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              className={`px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 flex items-center space-x-2 transition-colors ${getButtonBgClass()} ${getButtonHoverBgClass()} ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+              style={{ '--tw-ring-color': isDarkMode ? 'purple' : 'var(--accent-color-primary)' }}
             >
               {isSubmitting ? (
                 <>
@@ -329,15 +333,15 @@ const RoleForm = ({ role, permissions, onClose, onSuccess, onError }) => {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  {translations?.processing || "Traitement en cours..."}
+                  {translations?.processing}
                 </>
               ) : (
                 <>
                   <Save size={16} />
                   <span>
                     {isEdit 
-                      ? (translations?.update || 'Mettre à jour') 
-                      : (translations?.create || 'Créer')}
+                      ? translations?.update 
+                      : translations?.create}
                   </span>
                 </>
               )}

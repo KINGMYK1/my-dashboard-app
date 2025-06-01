@@ -2,16 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X, User, LogOut, Settings, Bell } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
+import NotificationPanel from '../NotificationPanel/NotificationPanel';
 
-const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
+const Header = ({ toggleSidebar = () => {}, sidebarExpanded = true, isMobile = false }) => {
   const { user, logout } = useAuth();
   const { translations } = useLanguage();
+  const { effectiveTheme } = useTheme(); // ✅ CORRECTION
+  const { getNotificationStats } = useNotification();
   const navigate = useNavigate();
+  
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // ✅ SOLUTION: Valeurs par défaut sécurisées
+  const isDarkMode = effectiveTheme === 'dark';
+  const notificationStats = getNotificationStats();
+
+  // ✅ Valeurs par défaut sécurisées
   const safeTranslations = {
     gamingClubTitle: 'Gaming Club',
     managementSystemSubtitle: 'Système de Gestion',
@@ -19,21 +28,24 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
     noNewNotifications: 'Aucune nouvelle notification',
     profileSettings: 'Paramètres',
     logout: 'Déconnexion',
-    ...translations // Les vraies traductions écrasent les valeurs par défaut
+    ...translations
   };
 
-  // Styles fixes pour le header (toujours thème sombre)
-  const headerBg = 'rgba(30, 41, 59, 0.9)';
-  const headerBorder = 'border-purple-400/20';
-  const iconButtonTextColor = 'text-gray-300';
-  const iconButtonHoverBg = 'hover:bg-purple-600/20';
-  const titleGradient = 'from-purple-400 to-blue-400';
-  const subtitleColor = 'text-gray-400';
-  const dropdownBg = 'rgba(30, 41, 59, 0.95)';
-  const dropdownBorder = 'border-purple-400/20';
-  const dropdownItemHoverBg = 'hover:bg-purple-600/20';
-  const dropdownItemTextColor = 'text-gray-300';
-  const logoutItemHoverBg = 'hover:bg-red-600/20';
+  // ✅ Extraction sécurisée des données utilisateur
+  const userData = user?.data || user || {};
+  const firstName = userData.firstName || '';
+  const lastName = userData.lastName || '';
+  const username = userData.username || '';
+
+  const userNameDisplay = (firstName || lastName) 
+    ? `${firstName} ${lastName}`.trim() 
+    : (username || "Utilisateur");
+
+  const initials = firstName && lastName
+    ? `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+    : username
+      ? username.charAt(0).toUpperCase()
+      : 'U';
 
   const handleLogout = async () => {
     try {
@@ -49,7 +61,6 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
     setShowUserMenu(false);
   };
 
-  // ✅ FONCTION UTILITAIRE pour gérer le titre de manière sécurisée
   const renderGameTitle = () => {
     const title = safeTranslations.gamingClubTitle || 'Gaming Club';
     const titleParts = title.split(' ');
@@ -58,10 +69,10 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
       return `${titleParts[0]} ${titleParts[1]}`;
     }
     
-    return title; // Retourne le titre complet si pas de split possible
+    return title;
   };
 
-  // ✅ FERMETURE DES MENUS au clic extérieur
+  // ✅ Fermeture des menus au clic extérieur
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (!event.target.closest('.dropdown-container')) {
@@ -78,9 +89,9 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
 
   return (
     <header 
-      className={`flex items-center justify-between px-4 py-2 border-b ${headerBorder} relative z-20`}
+      className="flex items-center justify-between px-4 py-2 border-b border-purple-400/20 relative z-20"
       style={{
-        background: headerBg,
+        background: 'rgba(30, 41, 59, 0.9)',
         backdropFilter: 'blur(15px)',
         height: '60px',
         minHeight: '60px',
@@ -91,21 +102,19 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
       <div className="flex items-center space-x-3">
         <button
           onClick={toggleSidebar}
-          className={`p-2 rounded-lg ${iconButtonTextColor} ${iconButtonHoverBg} transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/50`}
+          className="p-2 rounded-lg text-gray-300 hover:bg-purple-600/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/50"
           aria-label={sidebarExpanded ? 'Fermer le menu' : 'Ouvrir le menu'}
         >
           {sidebarExpanded ? <X size={20} /> : <Menu size={20} />}
         </button>
         
         <div className="flex items-center space-x-3">
-          {/* Logo image optimisé */}
           <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center shadow-lg">
             <img 
               src="/logo2.png" 
               alt="Gaming Club Logo" 
               className="w-8 h-8 object-contain transition-transform duration-200 hover:scale-110"
               onError={(e) => {
-                // Fallback si l'image ne charge pas
                 e.target.style.display = 'none';
                 e.target.nextSibling.style.display = 'flex';
               }}
@@ -118,10 +127,10 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
             </span>
           </div>
           <div>
-            <h1 className={`text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r ${titleGradient} transition-all duration-300 hover:scale-105`}>
+            <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400 transition-all duration-300 hover:scale-105">
               {renderGameTitle()}
             </h1>
-            <p className={`text-xs ${subtitleColor} hidden sm:block transition-colors duration-300`}>
+            <p className="text-xs text-gray-400 hidden sm:block transition-colors duration-300">
               {safeTranslations.managementSystemSubtitle}
             </p>
           </div>
@@ -129,96 +138,80 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
       </div>
 
       {/* Actions utilisateur */}
-      <div className="flex items-center space-x-2">
-        {/* Notifications */}
-        <div className="relative dropdown-container">
+      <div className="flex items-center space-x-4">
+        {/* ✅ Bouton de notifications avec badge */}
+        <div className="dropdown-container relative">
           <button
             onClick={() => {
               setShowNotifications(!showNotifications);
-              setShowUserMenu(false); // Fermer l'autre menu
+              setShowUserMenu(false);
             }}
-            className={`p-2 rounded-lg ${iconButtonTextColor} ${iconButtonHoverBg} transition-all duration-200 relative focus:outline-none focus:ring-2 focus:ring-purple-400/50`}
+            className="relative p-2 rounded-lg text-gray-300 hover:bg-purple-600/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/50"
             aria-label="Notifications"
           >
-            <Bell size={18} />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+            <Bell size={20} />
+            {notificationStats.unread > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold animate-pulse">
+                {notificationStats.unread > 99 ? '99+' : notificationStats.unread}
+              </span>
+            )}
           </button>
-          
+
+          {/* ✅ Panel de notifications */}
           {showNotifications && (
-            <div 
-              className={`absolute right-0 mt-2 w-80 rounded-lg shadow-xl border ${dropdownBorder} z-50 transform transition-all duration-200 ease-out`}
-              style={{
-                background: dropdownBg,
-                backdropFilter: 'blur(15px)',
-                animation: 'slideIn 0.2s ease-out'
-              }}
-            >
-              <div className="p-4">
-                <h3 className={`font-semibold mb-3 ${dropdownItemTextColor} flex items-center`}>
-                  <Bell size={16} className="mr-2" />
-                  {safeTranslations.notificationsHeader}
-                </h3>
-                <div className={`${subtitleColor} text-sm flex items-center justify-center py-8`}>
-                  <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-700/50 flex items-center justify-center">
-                      <Bell size={24} className="text-gray-500" />
-                    </div>
-                    <p>{safeTranslations.noNewNotifications}</p>
-                  </div>
-                </div>
-              </div>
+            <div className="absolute right-0 mt-2 z-50">
+              <NotificationPanel onClose={() => setShowNotifications(false)} />
             </div>
           )}
         </div>
-
+        
         {/* Menu utilisateur */}
-        <div className="relative dropdown-container">
+        <div className="dropdown-container relative">
           <button
             onClick={() => {
               setShowUserMenu(!showUserMenu);
-              setShowNotifications(false); // Fermer l'autre menu
+              setShowNotifications(false);
             }}
-            className={`flex items-center space-x-2 p-2 rounded-lg ${iconButtonTextColor} ${iconButtonHoverBg} transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/50`}
+            className="flex items-center space-x-2 p-2 rounded-lg text-gray-300 hover:bg-purple-600/20 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-400/50"
             aria-label="Menu utilisateur"
           >
             <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center shadow-lg transition-transform duration-200 hover:scale-110">
               <span className="text-white font-semibold text-sm">
-                {user?.firstName?.charAt(0) || 'U'}{user?.lastName?.charAt(0) || 'U'}
+                {initials}
               </span>
             </div>
             <div className="hidden md:block text-left">
-              <p className={`font-medium text-sm ${dropdownItemTextColor} transition-colors duration-300`}>
-                {user?.firstName || 'Utilisateur'} {user?.lastName || ''}
+              <p className="font-medium text-sm text-gray-300 transition-colors duration-300">
+                {userNameDisplay}
               </p>
-              <p className={`${subtitleColor} text-xs transition-colors duration-300`}>
-                {user?.role?.name || 'Rôle non défini'}
+              <p className="text-gray-400 text-xs transition-colors duration-300">
+                {userData?.role?.name || 'Rôle non défini'}
               </p>
             </div>
           </button>
 
           {showUserMenu && (
             <div 
-              className={`absolute right-0 mt-2 w-48 rounded-lg shadow-xl border ${dropdownBorder} z-50 transform transition-all duration-200 ease-out`}
+              className="absolute right-0 mt-2 w-48 rounded-lg shadow-xl border border-purple-400/20 z-50 transform transition-all duration-200 ease-out"
               style={{
-                background: dropdownBg,
+                background: 'rgba(30, 41, 59, 0.95)',
                 backdropFilter: 'blur(15px)',
                 animation: 'slideIn 0.2s ease-out'
               }}
             >
               <div className="py-2">
-                {/* Info utilisateur en en-tête (version mobile) */}
                 <div className="px-4 py-3 border-b border-gray-600/30 md:hidden">
-                  <p className={`font-medium text-sm ${dropdownItemTextColor}`}>
-                    {user?.firstName || 'Utilisateur'} {user?.lastName || ''}
+                  <p className="font-medium text-sm text-gray-300">
+                    {userNameDisplay}
                   </p>
-                  <p className={`${subtitleColor} text-xs`}>
-                    {user?.role?.name || 'Rôle non défini'}
+                  <p className="text-gray-400 text-xs">
+                    {userData?.role?.name || 'Rôle non défini'}
                   </p>
                 </div>
 
                 <button
                   onClick={handleSettingsClick}
-                  className={`flex items-center space-x-3 w-full px-4 py-3 ${dropdownItemTextColor} ${dropdownItemHoverBg} transition-all duration-200 text-left`}
+                  className="flex items-center space-x-3 w-full px-4 py-3 text-gray-300 hover:bg-purple-600/20 transition-all duration-200 text-left"
                 >
                   <Settings size={16} />
                   <span>{safeTranslations.profileSettings}</span>
@@ -228,7 +221,7 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
                 
                 <button
                   onClick={handleLogout}
-                  className={`flex items-center space-x-3 w-full px-4 py-3 text-red-300 ${logoutItemHoverBg} transition-all duration-200 text-left`}
+                  className="flex items-center space-x-3 w-full px-4 py-3 text-red-300 hover:bg-red-600/20 transition-all duration-200 text-left"
                 >
                   <LogOut size={16} />
                   <span>{safeTranslations.logout}</span>
@@ -239,7 +232,6 @@ const Header = ({ toggleSidebar, sidebarExpanded, isMobile }) => {
         </div>
       </div>
 
-      {/* Styles pour les animations */}
       <style jsx>{`
         @keyframes slideIn {
           from {

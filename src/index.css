@@ -52,3 +52,36 @@ html, body {
 .dark {
   color-scheme: dark;
 }
+
+/* Animation pour la barre de progression des toasts */
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Animations pour les notifications */
+.notification-enter {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.95);
+}
+
+.notification-enter-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
+}
+
+.notification-exit {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.notification-exit-active {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.95);
+  transition: opacity 300ms ease-in-out, transform 300ms ease-in-out;
+}

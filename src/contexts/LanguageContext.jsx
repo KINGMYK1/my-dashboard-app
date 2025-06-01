@@ -101,7 +101,77 @@ const defaultTranslations = {
   lastLogin: "Dernière connexion",
   actions: "Actions",
   neverConnected: "Jamais connecté",
-  inactive: "Inactif"
+  inactive: "Inactif",
+
+  // Permissions
+  permissionManagement: "Gestion des Permissions",
+  addPermission: "Nouvelle Permission",
+  editPermission: "Modifier la permission",
+  deletePermission: "Supprimer la permission",
+  deletePermissionConfirmation: "Êtes-vous sûr de vouloir supprimer la permission",
+  errorLoadingPermissions: "Erreur lors du chargement des permissions",
+  searchPermissions: "Rechercher des permissions...",
+  noPermissions: "Aucune permission disponible",
+  tryModifySearch: "Essayez de modifier votre recherche",
+  permissionName: "Nom de la permission",
+  permissionNameFormat: "Format recommandé: RESOURCE_ACTION (ex: USERS_VIEW, POSTES_MANAGE)",
+  permissionDescriptionPlaceholder: "Description de la permission...",
+  permissionSystemProtected: "Permission système protégée",
+  permissionSystemNotModifiable: "Cette permission système ne peut pas être modifiée pour des raisons de sécurité.",
+  permissionSystemNotDeletable: "Cette permission système ne peut pas être supprimée pour des raisons de sécurité.",
+  modifiable: "Modifiable",
+  characters: "caractères",
+  examplesOfPermissions: "Exemples de permissions",
+  modification: "Modification...",
+  creation: "Création...",
+  system: "Système",
+
+  // Catégories de permissions (pour Roles et Permissions)
+  permissionCategories: {
+    system: "Système",
+    users: "Utilisateurs",
+    roles: "Rôles", 
+    permissions: "Permissions",
+    postes: "Postes Gaming",
+    customers: "Clients",
+    sales: "Ventes",
+    inventory: "Inventaire",
+    finance: "Finances",
+    events: "Événements",
+    monitoring: "Monitoring",
+    sessions: "Sessions",
+    typesPostes: "Types de Postes",
+    other: "Autres"
+  },
+
+  // Settings
+  settingsTitle: "Paramètres",
+  generalTab: "Général",
+  appearanceTab: "Apparence",
+  languageTab: "Langue",
+  notificationsTab: "Notifications",
+  accountTab: "Compte",
+  systemTab: "Système",
+  saveButton: "Sauvegarder",
+  generalSettingsTitle: "Paramètres généraux",
+  autoSaveLabel: "Sauvegarde automatique",
+  autoSaveDescription: "Sauvegarder automatiquement les modifications",
+  sessionTimeoutLabel: "Délai d'expiration de session",
+  minutes: "minutes",
+  hour: "heure",
+  hours: "heures",
+  appearanceTitle: "Apparence",
+  themeLabel: "Thème",
+  languageInterfaceLabel: "Langue de l'interface",
+  notificationsTitle: "Notifications",
+  notificationsEnabledLabel: "Notifications activées",
+  notificationsEnabledDescription: "Recevoir des notifications dans l'application",
+  accountInfoTitle: "Informations du compte",
+  databaseLabel: "Base de données",
+  databaseDescription: "SQLite - Stockage local",
+  appVersionLabel: "Version de l'application",
+  appVersionValue: "v1.0.0 - Gaming Center Management",
+  exportDataButton: "Exporter les données"
 };
 
 // Provider du contexte
@@ -116,6 +186,11 @@ export const LanguageProvider = ({ children }) => {
     if (savedLanguage && availableLanguages.find(lang => lang.code === savedLanguage)) {
       setCurrentLanguage(savedLanguage);
       loadTranslations(savedLanguage);
+    } else {
+      // Définir 'fr' comme langue par défaut si rien n'est trouvé
+      setCurrentLanguage('fr');
+      localStorage.setItem('preferredLanguage', 'fr');
+      loadTranslations('fr');
     }
   }, []);
 

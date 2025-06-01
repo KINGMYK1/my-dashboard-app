@@ -1,6 +1,5 @@
 import axios from 'axios';
 
-// Configuration de base
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
@@ -9,17 +8,13 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: false // Pas besoin de cookies avec JWT
+  withCredentials: false
 });
 
 // Intercepteur de requête
 api.interceptors.request.use(
   (config) => {
-    // Debug des requêtes
     console.log(`🌐 ${config.method?.toUpperCase()} ${config.url}`);
-    
-    // Le token est configuré par authService.setAuthHeader()
-    // Pas besoin de logique spéciale ici
     return config;
   },
   (error) => {
@@ -28,11 +23,11 @@ api.interceptors.request.use(
   }
 );
 
-// Intercepteur de réponse
+// Intercepteur de réponse amélioré
 api.interceptors.response.use(
   (response) => {
     console.log(`✅ ${response.status} ${response.config.url}`);
-    return response.data; // Retourner directement les données
+    return response.data;
   },
   async (error) => {
     const originalRequest = error.config;
@@ -44,12 +39,14 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const errorCode = error.response.data?.errorCode;
       
-      // Cas spécifiques nécessitant une déconnexion immédiate
-      if (errorCode === 'SESSION_EXPIRED' || 
+      // ✅ AJOUT: Gestion spécifique de la session terminée
+      if (errorCode === 'SESSION_TERMINATED' || 
+          errorCode === 'SESSION_EXPIRED' || 
           errorCode === 'TOKEN_EXPIRED' || 
           errorCode === 'INVALID_TOKEN' ||
-          errorCode === 'SESSION_TERMINATED' ||
           errorCode === 'USER_INACTIVE') {
+        
+        console.log('🔒 [API] Session terminée détectée, déconnexion forcée');
         
         // Importer et nettoyer les données d'auth
         const authService = (await import('../services/authService')).default;
@@ -57,10 +54,14 @@ api.interceptors.response.use(
         
         // Émettre un événement personnalisé pour informer l'app
         window.dispatchEvent(new CustomEvent('auth:sessionExpired', {
-          detail: { errorCode, message: error.response.data?.message }
+          detail: { 
+            errorCode, 
+            message: error.response.data?.message,
+            reason: 'Session terminée par un administrateur' 
+          }
         }));
         
-        // Rediriger vers la page de connexion si pas déjà en cours
+        // Rediriger vers la page de connexion
         if (!window.location.pathname.includes('/login')) {
           window.location.href = '/';
         }
