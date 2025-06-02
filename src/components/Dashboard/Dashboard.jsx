@@ -11,9 +11,11 @@ import Users from '../../pages/Users/Users';
 import Roles from '../../pages/Roles/Roles';
 import Permissions from '../../pages/Permissions/Permissions';
 import Postes from '../../pages/Postes/Postes';
+import TypesPostes from '../../pages/Postes/TypesPostes'; // ✅ AJOUT
 import Settings from '../../pages/Settings/Settings';
 import Monitoring from '../../pages/Monitoring/Monitoring';
-import Notifications from '../../pages/Notifications/Notifications'
+import Notifications from '../../pages/Notifications/Notifications';
+
 const Dashboard = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -146,36 +148,35 @@ const Dashboard = () => {
             <Routes>
               <Route path="/" element={<Home />} />
               
-              {/* ✅ CORRECTION: Utiliser USERS_VIEW */}
               <Route path="/users" element={
                 hasPermission('USERS_VIEW') ? <Users /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* ✅ CORRECTION: Utiliser ROLES_VIEW */}
               <Route path="/roles" element={
                 hasPermission('ROLES_VIEW') ? <Roles /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* ✅ CORRECTION: Utiliser PERMISSIONS_VIEW */}
               <Route path="/permissions" element={
                 hasPermission('PERMISSIONS_VIEW') ? <Permissions /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* Routes postes - Permission POSTES_VIEW */}
+              {/* ✅ CORRECTION: Routes postes complètes */}
               <Route path="/postes" element={
                 hasPermission('POSTES_VIEW') ? <Postes /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* Routes monitoring - Permission MONITORING_VIEW */}
+              {/* ✅ AJOUT: Route pour les types de postes */}
+              <Route path="/postes/types" element={
+                hasPermission('POSTES_MANAGE') ? <TypesPostes /> : <Navigate to="/dashboard" replace />
+              } />
+              
               <Route path="/monitoring" element={
                 hasPermission('MONITORING_VIEW') ? <Monitoring /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* Settings - accessible à tous */}
               <Route path="/settings" element={<Settings />} />
               <Route path="/notifications" element={<Notifications />} />
               
-              {/* Redirection par défaut */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>

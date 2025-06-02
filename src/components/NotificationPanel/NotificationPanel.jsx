@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, X, Eye, EyeOff, Check, Trash2, Filter, Settings, ChevronRight } from 'lucide-react';
+import { Bell, X, Eye, EyeOff, Check, Trash2, Filter, Settings, ChevronRight, RefreshCw } from 'lucide-react';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
@@ -7,25 +7,31 @@ import { useNavigate } from 'react-router-dom';
 const NotificationPanel = ({ onClose }) => {
   const [filter, setFilter] = useState('all');
   const {
-    notifications,
+    notifications, // ✅ Toutes les notifications (visibles et historique)
     getNotificationStats,
     dismissNotification,
+    deleteNotification, // ✅ NOUVEAU: Suppression définitive
     markAsRead,
     clearAllNotifications,
-    clearByCategory
+    clearByCategory,
+    showNotificationAgain // ✅ NOUVEAU: Réafficher une notification
   } = useNotification();
   
   const { translations } = useLanguage();
   const navigate = useNavigate();
   const stats = getNotificationStats();
 
-  // Filtrer les notifications
+  // ✅ CORRECTION: Filtrer sur toutes les notifications (pas seulement visibles)
   const filteredNotifications = notifications.filter(notification => {
     switch (filter) {
       case 'unread':
-        return !notification.read;
+        return !notification.isRead;
       case 'read':
-        return notification.read;
+        return notification.isRead;
+      case 'visible':
+        return notification.isVisible;
+      case 'hidden':
+        return !notification.isVisible;
       case 'system':
         return notification.category === 'system';
       case 'user':
@@ -41,14 +47,19 @@ const NotificationPanel = ({ onClose }) => {
 
   const handleMarkAllAsRead = () => {
     notifications.forEach(notification => {
-      if (!notification.read) {
+      if (!notification.isRead) {
         markAsRead(notification.id);
       }
     });
   };
 
   const handleToggleRead = (notification) => {
-    markAsRead(notification.id, !notification.read);
+    markAsRead(notification.id, !notification.isRead);
+  };
+
+  // ✅ NOUVEAU: Réafficher une notification masquée
+  const handleShowAgain = (notificationId) => {
+    showNotificationAgain(notificationId);
   };
 
   const handleGoToSettings = () => {
@@ -87,6 +98,11 @@ const NotificationPanel = ({ onClose }) => {
                 {stats.unread}
               </span>
             )}
+            {stats.visible > 0 && (
+              <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded-full font-semibold">
+                {stats.visible} visibles
+              </span>
+            )}
             <button
               onClick={onClose}
               className={`p-1 rounded ${textSecondary} ${hoverBg} transition-colors`}
@@ -96,7 +112,7 @@ const NotificationPanel = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Filtres */}
+        {/* ✅ NOUVEAU: Filtres étendus */}
         <div className="flex items-center space-x-2 mb-3">
           <Filter size={14} className={textSecondary} />
           <select
@@ -106,11 +122,15 @@ const NotificationPanel = ({ onClose }) => {
           >
             <option value="all">Toutes ({notifications.length})</option>
             <option value="unread">Non lues ({stats.unread})</option>
-            <option value="read">Lues ({stats.read})</option>
-            <option value="system">Système ({stats.byCategory.system || 0})</option>
-            <option value="user">Utilisateur ({stats.byCategory.user || 0})</option>
-            <option value="data">Données ({stats.byCategory.data || 0})</option>
-            <option value="security">Sécurité ({stats.byCategory.security || 0})</option>
+            <option value="read">Lues ({notifications.length - stats.unread})</option>
+            <option value="visible">Visibles ({stats.visible})</option>
+            <option value="hidden">Masquées ({notifications.length - stats.visible})</option>
+            <optgroup label="Par catégorie">
+              <option value="system">Système ({stats.byCategory.system || 0})</option>
+              <option value="user">Utilisateur ({stats.byCategory.user || 0})</option>
+              <option value="data">Données ({stats.byCategory.data || 0})</option>
+              <option value="security">Sécurité ({stats.byCategory.security || 0})</option>
+            </optgroup>
           </select>
         </div>
 
@@ -164,18 +184,34 @@ const NotificationPanel = ({ onClose }) => {
             <div
               key={notification.id}
               className={`p-3 border-b border-gray-700/50 transition-colors ${hoverBg} ${
-                !notification.read ? 'border-l-2 border-l-blue-400' : ''
+                !notification.isRead ? 'border-l-2 border-l-blue-400' : ''
+              } ${
+                !notification.isVisible ? 'opacity-60 bg-gray-800/30' : ''
               }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <p className={`text-sm font-medium truncate ${textPrimary} ${
-                      !notification.read ? 'font-semibold' : ''
+                      !notification.isRead ? 'font-semibold' : ''
                     }`}>
                       {notification.title}
                     </p>
                     <div className="flex items-center space-x-1 ml-2">
+                      {/* ✅ NOUVEAU: Bouton pour réafficher si masqué */}
+                      {!notification.isVisible && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleShowAgain(notification.id);
+                          }}
+                          className="p-1 rounded transition-colors text-green-400 hover:text-green-300"
+                          title="Réafficher cette notification"
+                        >
+                          <RefreshCw size={12} />
+                        </button>
+                      )}
+                      
                       {/* Bouton œil pour marquer comme lu/non lu */}
                       <button
                         onClick={(e) => {
@@ -183,23 +219,23 @@ const NotificationPanel = ({ onClose }) => {
                           handleToggleRead(notification);
                         }}
                         className={`p-1 rounded transition-colors ${
-                          notification.read
+                          notification.isRead
                             ? `${textSecondary} hover:text-blue-400`
                             : 'text-blue-400 hover:text-blue-300'
                         }`}
-                        title={notification.read ? 'Marquer comme non lu' : 'Marquer comme lu'}
+                        title={notification.isRead ? 'Marquer comme non lu' : 'Marquer comme lu'}
                       >
-                        {notification.read ? <EyeOff size={12} /> : <Eye size={12} />}
+                        {notification.isRead ? <EyeOff size={12} /> : <Eye size={12} />}
                       </button>
                       
-                      {/* Bouton supprimer */}
+                      {/* ✅ CORRECTION: Bouton supprimer définitivement */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          dismissNotification(notification.id);
+                          deleteNotification(notification.id);
                         }}
                         className={`p-1 rounded transition-colors ${textSecondary} hover:text-red-400`}
-                        title="Supprimer"
+                        title="Supprimer définitivement"
                       >
                         <X size={12} />
                       </button>
@@ -216,6 +252,13 @@ const NotificationPanel = ({ onClose }) => {
                     </span>
                     
                     <div className="flex items-center space-x-2">
+                      {/* ✅ Badge d'état de visibilité */}
+                      {!notification.isVisible && (
+                        <span className="text-xs px-2 py-1 bg-gray-600/20 text-gray-400 rounded-full">
+                          masqué
+                        </span>
+                      )}
+                      
                       {/* Badge de catégorie */}
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                         notification.category === 'system' 
@@ -257,7 +300,7 @@ const NotificationPanel = ({ onClose }) => {
             onClick={handleGoToSettings}
             className={`w-full text-xs ${textSecondary} ${hoverBg} py-2 rounded flex items-center justify-center space-x-1 transition-colors`}
           >
-            <span>Voir toutes les notifications</span>
+            <span>Voir toutes les notifications ({notifications.length})</span>
             <ChevronRight size={12} />
           </button>
         </div>

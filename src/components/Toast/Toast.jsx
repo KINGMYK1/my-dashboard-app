@@ -1,289 +1,165 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, AlertCircle, Info, X, Eye, EyeOff } from 'lucide-react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
-// Types de notifications avec leurs configurations
-const TOAST_TYPES = {
-  success: {
-    icon: CheckCircle,
-    bgClass: {
-      dark: 'bg-green-600/90',
-      light: 'bg-green-500/90'
-    },
-    borderClass: {
-      dark: 'border-green-500/50',
-      light: 'border-green-400/50'
-    },
-    iconColor: {
-      dark: 'text-green-300',
-      light: 'text-green-600'
-    }
-  },
-  error: {
-    icon: XCircle,
-    bgClass: {
-      dark: 'bg-red-600/90',
-      light: 'bg-red-500/90'
-    },
-    borderClass: {
-      dark: 'border-red-500/50',
-      light: 'border-red-400/50'
-    },
-    iconColor: {
-      dark: 'text-red-300',
-      light: 'text-red-600'
-    }
-  },
-  warning: {
-    icon: AlertCircle,
-    bgClass: {
-      dark: 'bg-orange-600/90',
-      light: 'bg-orange-500/90'
-    },
-    borderClass: {
-      dark: 'border-orange-500/50',
-      light: 'border-orange-400/50'
-    },
-    iconColor: {
-      dark: 'text-orange-300',
-      light: 'text-orange-600'
-    }
-  },
-  info: {
-    icon: Info,
-    bgClass: {
-      dark: 'bg-blue-600/90',
-      light: 'bg-blue-500/90'
-    },
-    borderClass: {
-      dark: 'border-blue-500/50',
-      light: 'border-blue-400/50'
-    },
-    iconColor: {
-      dark: 'text-blue-300',
-      light: 'text-blue-600'
-    }
-  }
-};
-
-const DEFAULT_DURATION = 5000;
-
-const Toast = ({ 
-  type = 'info', 
-  message, 
-  title, 
-  onClose, 
-  duration = DEFAULT_DURATION,
+const Toast = ({
+  type = 'info',
+  message,
+  title,
+  duration = 5000,
   isVisible = true,
-  onAction = null,
-  actionText = null,
+  onClose,
+  onAction,
+  actionText,
   priority = 'normal',
   category = 'general',
-  theme,
+  theme = 'dark',
   onMarkAsRead,
-  isRead = false
+  isRead = false,
+  canDismiss = true // ✅ NOUVEAU: Contrôler si on peut masquer
 }) => {
-  const [visible, setVisible] = useState(isVisible);
-  const [isHovered, setIsHovered] = useState(false);
-  const { effectiveTheme } = useTheme();
-  
-  const currentTheme = theme || effectiveTheme;
-  const isDarkMode = currentTheme === 'dark';
-  
-  // Configuration du type de toast
-  const toastConfig = TOAST_TYPES[type] || TOAST_TYPES.info;
-  const IconComponent = toastConfig.icon;
-  
-  // Classes dynamiques basées sur le thème
-  const getTextColorClass = (isPrimary) => isDarkMode ? 
-    (isPrimary ? 'text-white' : 'text-gray-200') : 
-    (isPrimary ? 'text-gray-900' : 'text-gray-700');
-  
-  const getBackgroundClass = () => {
-    if (priority === 'critical') {
-      return isDarkMode ? 'bg-red-900/95' : 'bg-red-100/95';
-    }
-    return isDarkMode ? 
-      'bg-gray-800/95' : 
-      'bg-white/95';
-  };
-  
-  const getBorderClass = () => {
-    if (priority === 'critical') {
-      return 'border-red-500';
-    }
-    return toastConfig.borderClass[currentTheme];
-  };
-  
-  const getPriorityIndicator = () => {
-    switch (priority) {
-      case 'critical':
-        return 'border-l-4 border-red-500';
-      case 'high':
-        return 'border-l-4 border-orange-500';
-      default:
-        return 'border-l-4 border-transparent';
-    }
-  };
+  const [show, setShow] = useState(isVisible);
 
-  // Effet pour gérer la disparition automatique
   useEffect(() => {
-    setVisible(isVisible);
-    
-    if (isVisible && duration > 0 && !isHovered) {
+    setShow(isVisible);
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (duration > 0 && show) {
       const timer = setTimeout(() => {
-        setVisible(false);
-        if (onClose) setTimeout(onClose, 300);
+        handleClose();
       }, duration);
-      
       return () => clearTimeout(timer);
     }
-  }, [isVisible, duration, onClose, isHovered]);
+  }, [duration, show]);
 
   const handleClose = () => {
-    setVisible(false);
-    if (onClose) setTimeout(onClose, 300);
-  };
-
-  const handleAction = () => {
-    if (onAction) {
-      onAction();
-    }
-    handleClose();
-  };
-
-  const handleMarkAsRead = () => {
-    if (onMarkAsRead) {
-      onMarkAsRead();
+    if (canDismiss && onClose) { // ✅ Vérifier canDismiss
+      setShow(false);
+      setTimeout(() => {
+        onClose();
+      }, 300);
     }
   };
 
-  // Si le toast n'est pas visible, ne rien rendre
-  if (!visible) return null;
+  const getIcon = () => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle className="text-green-400" size={20} />;
+      case 'error':
+        return <XCircle className="text-red-400" size={20} />;
+      case 'warning':
+        return <AlertTriangle className="text-yellow-400" size={20} />;
+      default:
+        return <Info className="text-blue-400" size={20} />;
+    }
+  };
+
+  const getBackgroundColor = () => {
+    if (theme === 'dark') {
+      switch (type) {
+        case 'success':
+          return 'bg-green-900/90 border-green-400/30';
+        case 'error':
+          return 'bg-red-900/90 border-red-400/30';
+        case 'warning':
+          return 'bg-yellow-900/90 border-yellow-400/30';
+        default:
+          return 'bg-blue-900/90 border-blue-400/30';
+      }
+    } else {
+      switch (type) {
+        case 'success':
+          return 'bg-green-50 border-green-200';
+        case 'error':
+          return 'bg-red-50 border-red-200';
+        case 'warning':
+          return 'bg-yellow-50 border-yellow-200';
+        default:
+          return 'bg-blue-50 border-blue-200';
+      }
+    }
+  };
+
+  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-900';
+  const secondaryTextColor = theme === 'dark' ? 'text-gray-300' : 'text-gray-600';
+
+  if (!show) return null;
 
   return (
-    <div 
-      className={`max-w-md w-full transform transition-all duration-300 ease-in-out ${getPriorityIndicator()}`}
-      style={{ 
-        transform: visible ? 'translateY(0) scale(1)' : 'translateY(-16px) scale(0.95)',
-        opacity: visible ? 1 : 0
+    <div
+      className={`max-w-sm w-full ${getBackgroundColor()} border rounded-lg shadow-lg p-4 transition-all duration-300 transform ${
+        show ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+      } ${priority === 'critical' ? 'ring-2 ring-red-500 animate-pulse' : ''}`}
+      style={{
+        backdropFilter: 'blur(10px)'
       }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
-      <div 
-        className={`
-          rounded-lg shadow-xl border 
-          ${getBackgroundClass()} 
-          ${getBorderClass()}
-          p-4 relative
-          ${priority === 'critical' ? 'ring-2 ring-red-500' : ''}
-        `}
-        style={{
-          backdropFilter: 'blur(10px)',
-          boxShadow: priority === 'critical' ? 
-            '0 20px 25px -5px rgba(239, 68, 68, 0.3), 0 10px 10px -5px rgba(239, 68, 68, 0.1)' :
-            '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-        }}
-      >
-        {/* Indicateur de lecture */}
-        {!isRead && (
-          <div className="absolute top-2 right-12 w-2 h-2 bg-blue-500 rounded-full"></div>
-        )}
-
-        <div className="flex items-start">
-          <div className="flex-shrink-0 mr-3 pt-0.5">
-            <IconComponent 
-              size={20} 
-              className={toastConfig.iconColor[currentTheme]}
-            />
-          </div>
-          
-          <div className="flex-grow">
-            {title && (
-              <div className="flex items-center justify-between mb-1">
-                <h3 className={`font-bold ${getTextColorClass(true)}`}>
-                  {title}
-                </h3>
-                {priority === 'critical' && (
-                  <span className="text-xs px-2 py-1 bg-red-500 text-white rounded-full">
-                    CRITIQUE
-                  </span>
-                )}
-              </div>
-            )}
-            
-            <p className={`text-sm ${getTextColorClass(false)}`}>
-              {message}
-            </p>
-            
-            {/* Métadonnées */}
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center space-x-2">
-                {category !== 'general' && (
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'
-                  }`}>
-                    {category}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                {/* Bouton marquer comme lu */}
-                {!isRead && onMarkAsRead && (
-                  <button
-                    onClick={handleMarkAsRead}
-                    className={`p-1 rounded hover:bg-opacity-20 ${
-                      isDarkMode ? 'hover:bg-white' : 'hover:bg-black'
-                    } transition-colors`}
-                    title="Marquer comme lu"
-                  >
-                    <Eye size={14} className={getTextColorClass(false)} />
-                  </button>
-                )}
-                
-                {isRead && (
-                  <EyeOff size={14} className={`${getTextColorClass(false)} opacity-50`} />
-                )}
-              </div>
-            </div>
-            
-            {/* Bouton d'action si présent */}
-            {onAction && actionText && (
-              <button
-                onClick={handleAction}
-                className={`mt-3 px-3 py-1 rounded transition-colors ${
-                  isDarkMode 
-                    ? 'bg-white bg-opacity-20 hover:bg-opacity-30 text-white' 
-                    : 'bg-black bg-opacity-10 hover:bg-opacity-20 text-gray-900'
-                } text-sm`}
-              >
-                {actionText}
-              </button>
-            )}
-          </div>
-          
-          <button 
-            onClick={handleClose}
-            className={`flex-shrink-0 ml-2 p-1 rounded hover:bg-opacity-20 ${
-              isDarkMode ? 'hover:bg-white' : 'hover:bg-black'
-            } transition-colors`}
-            aria-label="Fermer"
-          >
-            <X size={18} className={getTextColorClass(false)} />
-          </button>
+      <div className="flex items-start">
+        <div className="flex-shrink-0">
+          {getIcon()}
         </div>
-
-        {/* Barre de progression pour le temps restant */}
-        {duration > 0 && !isHovered && (
-          <div className="absolute bottom-0 left-0 h-1 bg-current opacity-20 rounded-b-lg"
-            style={{
-              animation: `shrink ${duration}ms linear forwards`
-            }}
-          />
+        
+        <div className="ml-3 flex-1">
+          {title && (
+            <h3 className={`text-sm font-medium ${textColor} ${!isRead ? 'font-bold' : ''}`}>
+              {title}
+            </h3>
+          )}
+          <p className={`text-sm ${secondaryTextColor} ${title ? 'mt-1' : ''}`}>
+            {message}
+          </p>
+          
+          {actionText && onAction && (
+            <button
+              onClick={onAction}
+              className={`mt-2 text-sm font-medium ${
+                theme === 'dark' ? 'text-purple-400 hover:text-purple-300' : 'text-purple-600 hover:text-purple-700'
+              } transition-colors`}
+            >
+              {actionText}
+            </button>
+          )}
+        </div>
+        
+        {/* ✅ CORRECTION: Bouton de fermeture seulement si canDismiss */}
+        {canDismiss && (
+          <div className="ml-4 flex-shrink-0">
+            <button
+              onClick={handleClose}
+              className={`inline-flex ${secondaryTextColor} hover:${textColor} transition-colors`}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+        
+        {/* ✅ Indicateur de priorité critique */}
+        {priority === 'critical' && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
         )}
       </div>
+      
+      {/* ✅ Barre de progression pour les notifications temporaires */}
+      {duration > 0 && show && canDismiss && (
+        <div className="mt-2">
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
+            <div 
+              className="bg-current h-1 rounded-full transition-all ease-linear"
+              style={{
+                width: '100%',
+                animation: `shrink ${duration}ms linear`
+              }}
+            ></div>
+          </div>
+        </div>
+      )}
+      
+      <style jsx>{`
+        @keyframes shrink {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}</style>
     </div>
   );
 };

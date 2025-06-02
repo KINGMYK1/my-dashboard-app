@@ -1,269 +1,391 @@
-import React, { useState } from 'react';
-import { Monitor, Plus, Edit3, Trash2, Tag, DollarSign, Clock, Search, XCircle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { 
+  Plus, Search, Edit2, Trash2, Settings, 
+  DollarSign, Users, AlertCircle
+} from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useTypesPostes, useDeleteTypePoste } from '../../hooks/useTypePostes';
+import { 
+  useTypesPostes, 
+  useDeleteTypePoste
+} from '../../hooks/useTypePostes';
+import { useNotification } from '../../contexts/NotificationContext';
 import TypePosteForm from './TypePosteForm';
+import TypePosteStatistics from './TypePosteStatistics';
+import CalculateurTarifs from './CalculateurTarifs';
 import ConfirmationDialog from '../../components/ConfirmationDialog/ConfirmationDialog';
-import { Button, Card, Spinner, Badge } from '../../components/ui';
+import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 
 const TypesPostes = () => {
   const { translations } = useLanguage();
-  const { hasPermission } = useAuth();
   const { effectiveTheme } = useTheme();
+  const { showError, showSuccess } = useNotification();
 
-  // États locaux
   const [searchTerm, setSearchTerm] = useState('');
-  const [showTypePosteForm, setShowTypePosteForm] = useState(false);
-  const [editingTypePoste, setEditingTypePoste] = useState(null);
-  const [confirmDialog, setConfirmDialog] = useState({
-    show: false,
-    typePoste: null,
-    title: '',
-    message: ''
-  });
+  const [selectedTypePoste, setSelectedTypePoste] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [typePosteToDelete, setTypePosteToDelete] = useState(null);
+  const [showStatistics, setShowStatistics] = useState(null);
+  const [showCalculateur, setShowCalculateur] = useState(false);
 
-  // Hooks de données
   const { data: typesPostes = [], isLoading, isError, error } = useTypesPostes();
   const deleteTypePosteMutation = useDeleteTypePoste();
 
-  // Permissions
-  const canViewTypesPostes = hasPermission('POSTES_VIEW'); // Assuming POSTES_VIEW covers types as well
-  const canManageTypesPostes = hasPermission('POSTES_MANAGE');
-
   const isDarkMode = effectiveTheme === 'dark';
 
-  // Styles dynamiques basés sur le thème
-  const getTextColorClass = (isPrimary) => isDarkMode ? (isPrimary ? 'text-white' : 'text-gray-300') : (isPrimary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]');
-  const getBgColorClass = () => isDarkMode ? 'bg-gray-800' : 'bg-[var(--background-card)]';
-  const getBorderColorClass = () => isDarkMode ? 'border-gray-700' : 'border-[var(--border-color)]';
-  const getInputBgClass = () => isDarkMode ? 'bg-gray-700' : 'bg-[var(--background-input)]';
-  const getInputTextColorClass = () => isDarkMode ? 'text-white' : 'text-[var(--text-primary)]';
-  const getButtonBgClass = () => isDarkMode ? 'bg-purple-600' : 'bg-[var(--accent-color-primary)]';
-  const getButtonHoverBgClass = () => isDarkMode ? 'hover:bg-purple-700' : 'hover:opacity-80';
-  const getErrorColorClass = () => isDarkMode ? 'text-red-400' : 'text-[var(--error-color)]';
-  const getErrorBgClass = () => isDarkMode ? 'bg-red-900/30' : 'bg-[var(--error-color)]10';
-  const getErrorBorderClass = () => isDarkMode ? 'border-red-700' : 'border-[var(--error-color)]';
-
   // Filtrage des types de postes
-  const filteredTypesPostes = typesPostes.filter(typePoste =>
-    typePoste.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    typePoste.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTypesPostes = useMemo(() => {
+    if (!searchTerm) return typesPostes;
+    return typesPostes.filter(type =>
+      type.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (type.description && type.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [typesPostes, searchTerm]);
 
-  // Gestionnaires d'événements
-  const openAddTypePosteForm = () => {
-    setEditingTypePoste(null);
-    setShowTypePosteForm(true);
+  const handleOpenForm = (typePoste = null) => {
+    setSelectedTypePoste(typePoste);
+    setIsFormOpen(true);
   };
 
-  const openEditTypePosteForm = (typePoste) => {
-    setEditingTypePoste(typePoste);
-    setShowTypePosteForm(true);
+  const handleCloseForm = () => {
+    setSelectedTypePoste(null);
+    setIsFormOpen(false);
   };
 
-  const closeTypePosteForm = () => {
-    setShowTypePosteForm(false);
-    setEditingTypePoste(null);
-  };
-
-  const openDeleteDialog = (typePoste) => {
-    setConfirmDialog({
-      show: true,
-      typePoste: typePoste,
-      title: translations.deleteTypePosteConfirmation || `Confirmer la suppression du type de poste "${typePoste.nom}"`,
-      message: `${translations.deleteTypePosteConfirmationMessage || "Êtes-vous sûr de vouloir supprimer le type de poste"} "${typePoste.nom}"? ${translations.thisActionCannot || "Cette action est irréversible."}`
-    });
-  };
-
-  const confirmDeleteTypePoste = async () => {
-    if (confirmDialog.typePoste) {
-      await deleteTypePosteMutation.mutateAsync(confirmDialog.typePoste.id);
-      setConfirmDialog({ show: false, typePoste: null, title: '', message: '' });
+  const handleDelete = async () => {
+    if (typePosteToDelete) {
+      try {
+        await deleteTypePosteMutation.mutateAsync(typePosteToDelete.id);
+        setTypePosteToDelete(null);
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+      }
     }
   };
 
-  const cancelDeleteTypePoste = () => {
-    setConfirmDialog({ show: false, typePoste: null, title: '', message: '' });
+  const handleShowStatistics = (typePoste) => {
+    setShowStatistics(typePoste);
   };
 
-  // Vérification des permissions
-  if (!canViewTypesPostes) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className={`${getErrorBgClass()} border ${getErrorBorderClass()} rounded-lg p-4`}>
-          <p className={`${getErrorColorClass()}`}>
-            {translations.noPermissionViewTypesPostes || "Vous n'avez pas les permissions pour voir les types de postes."}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: 'MAD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
+  // Styles dynamiques basés sur le thème
+  const getTextColorClass = (isPrimary) => 
+    isDarkMode 
+      ? (isPrimary ? 'text-white' : 'text-gray-300') 
+      : (isPrimary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]');
+  
+  const getBgColorClass = () => 
+    isDarkMode ? 'bg-gray-800' : 'bg-[var(--background-card)]';
+  
+  const getBorderColorClass = () => 
+    isDarkMode ? 'border-gray-700' : 'border-[var(--border-color)]';
+  
+  const getInputBgClass = () => 
+    isDarkMode ? 'bg-gray-700' : 'bg-[var(--background-input)]';
+  
+  const getInputTextColorClass = () => 
+    isDarkMode ? 'text-white' : 'text-[var(--text-primary)]';
+  
+  const getButtonBgClass = () => 
+    isDarkMode ? 'bg-purple-600' : 'bg-[var(--accent-color-primary)]';
+  
+  const getButtonHoverBgClass = () => 
+    isDarkMode ? 'hover:bg-purple-700' : 'hover:opacity-80';
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center">
-          <Spinner size="lg" />
-          <span className={`ml-2 ${getTextColorClass(false)}`}>{translations.loadingTypesPostes || "Chargement des types de postes..."}</span>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="large" />
       </div>
     );
   }
 
   if (isError) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className={`${getErrorBgClass()} border ${getErrorBorderClass()} rounded-lg p-4`}>
-          <p className={`${getErrorColorClass()}`}>
-            {translations.errorLoadingTypesPostes || "Erreur lors du chargement des types de postes"}: {error?.response?.data?.message || error?.message}
+      <div className={`min-h-screen flex items-center justify-center p-4`}>
+        <div className={`${getBgColorClass()} rounded-lg p-6 ${getBorderColorClass()} border max-w-md w-full text-center`}>
+          <AlertCircle className="mx-auto mb-4 text-red-500" size={48} />
+          <h3 className={`text-lg font-semibold mb-2 ${getTextColorClass(true)}`}>
+            {translations.errorLoadingTypesPostes || 'Erreur lors du chargement des types de postes'}
+          </h3>
+          <p className={`${getTextColorClass(false)} mb-4`}>
+            {error?.message || 'Une erreur inattendue s\'est produite'}
           </p>
+          <button
+            onClick={() => window.location.reload()}
+            className={`px-4 py-2 ${getButtonBgClass()} ${getButtonHoverBgClass()} text-white rounded-lg transition-colors`}
+          >
+            {translations.retry || 'Réessayer'}
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* En-tête */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className={`text-2xl font-bold flex items-center ${getTextColorClass(true)}`}>
-          <Tag className={`mr-2 ${isDarkMode ? 'text-blue-400' : 'text-[var(--accent-color-secondary)]'}`} />
-          {translations.typePosteManagement || 'Gestion des Types de Postes'}
-        </h1>
-
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder={translations.search || "Rechercher..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`pl-10 pr-4 py-2 rounded-md ${getInputBgClass()} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none`}
-            />
-            <Search size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${getTextColorClass(false)}`} />
-          </div>
-
-          {canManageTypesPostes && (
-            <Button onClick={openAddTypePosteForm} variant="primary" className={`${getButtonBgClass()} ${getButtonHoverBgClass()}`}>
-              <Plus className="mr-2" size={16} />
-              {translations.addTypePoste || 'Ajouter un Type de Poste'}
-            </Button>
-          )}
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className={`text-2xl font-bold ${getTextColorClass(true)}`}>
+            {translations.typePosteManagement || 'Gestion des Types de Postes'}
+          </h1>
+          <p className={`${getTextColorClass(false)} mt-1`}>
+            {typesPostes.length > 0 
+              ? `${typesPostes.length} type${typesPostes.length > 1 ? 's' : ''} de poste${typesPostes.length > 1 ? 's' : ''}`
+              : (translations.noTypesPostesFound || 'Aucun type de poste trouvé')
+            }
+          </p>
         </div>
+        
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowCalculateur(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+          >
+            <span>Calculateur Tarifs</span>
+          </button>
+          
+          <button
+            onClick={() => handleOpenForm()}
+            className={`flex items-center space-x-2 px-4 py-2 ${getButtonBgClass()} ${getButtonHoverBgClass()} text-white rounded-lg transition-colors`}
+          >
+            <Plus size={20} />
+            <span>{translations.addTypePoste || 'Nouveau Type de Poste'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Barre de recherche */}
+      <div className="relative">
+        <Search size={20} className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${getTextColorClass(false)}`} />
+        <input
+          type="text"
+          placeholder={translations.searchTypesPostes || 'Rechercher un type de poste...'}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className={`w-full pl-10 pr-4 py-3 rounded-lg ${getInputBgClass()} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors`}
+        />
       </div>
 
       {/* Liste des types de postes */}
       {filteredTypesPostes.length === 0 ? (
-        <Card className={`p-8 text-center ${getBgColorClass()}`}>
-          <Tag className={`mx-auto h-12 w-12 ${getTextColorClass(false)} mb-4`} />
-          <p className={`${getTextColorClass(false)}`}>
-            {searchTerm ? translations.noMatchingTypesPostes || "Aucun type de poste correspondant à votre recherche." : translations.noTypesPostesFound || "Aucun type de poste trouvé."}
-            {canManageTypesPostes && ` ${translations.startByCreatingOne || "Commencez par en créer un !"}`}
+        <div className={`${getBgColorClass()} rounded-lg p-8 ${getBorderColorClass()} border text-center`}>
+          <Settings className={`mx-auto mb-4 ${getTextColorClass(false)}`} size={48} />
+          <h3 className={`text-lg font-semibold mb-2 ${getTextColorClass(true)}`}>
+            {searchTerm 
+              ? (translations.noMatchingTypesPostes || 'Aucun type de poste correspondant à votre recherche')
+              : (translations.noTypesPostesFound || 'Aucun type de poste trouvé')
+            }
+          </h3>
+          <p className={`${getTextColorClass(false)} mb-4`}>
+            {searchTerm
+              ? 'Essayez de modifier votre recherche ou ajoutez un nouveau type de poste.'
+              : 'Commencez par créer votre premier type de poste.'
+            }
           </p>
-        </Card>
+          {!searchTerm && (
+            <button
+              onClick={() => handleOpenForm()}
+              className={`px-4 py-2 ${getButtonBgClass()} ${getButtonHoverBgClass()} text-white rounded-lg transition-colors`}
+            >
+              {translations.addTypePoste || 'Nouveau Type de Poste'}
+            </button>
+          )}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTypesPostes.map((typePoste) => (
-            <Card key={typePoste.id} className={`p-4 hover:shadow-lg transition-shadow ${getBgColorClass()}`}>
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className={`font-semibold text-lg ${getTextColorClass(true)}`}>{typePoste.nom}</h3>
-                  <p className={`text-sm ${getTextColorClass(false)}`}>
-                    {typePoste.description || translations.noDescription || 'Pas de description'}
-                  </p>
-                </div>
-                <Badge color={typePoste.estActif ? 'green' : 'gray'} size="sm">
-                  {typePoste.estActif ? translations.active || 'Actif' : translations.inactive || 'Inactif'}
-                </Badge>
-              </div>
-
-              {/* Informations du type de poste */}
-              <div className="space-y-2 mb-4">
-                <p className={`text-sm ${getTextColorClass(false)} flex items-center`}>
-                  <DollarSign size={16} className={`mr-2 ${isDarkMode ? 'text-green-400' : 'text-[var(--success-color)]'}`} />
-                  <span className={`font-medium ${getTextColorClass(true)}`}>{translations.hourlyRate || "Tarif Horaire Base"}:</span> {typePoste.tarifHoraireBase}€/h
-                </p>
-                {typePoste.icone && (
-                  <p className={`text-sm ${getTextColorClass(false)} flex items-center`}>
-                    <Monitor size={16} className={`mr-2 ${isDarkMode ? 'text-purple-400' : 'text-[var(--accent-color-primary)]'}`} />
-                    <span className={`font-medium ${getTextColorClass(true)}`}>{translations.icon || "Icône"}:</span> {typePoste.icone}
-                  </p>
-                )}
-                {typePoste.couleur && (
-                  <p className={`text-sm ${getTextColorClass(false)} flex items-center`}>
-                    <div className="w-4 h-4 rounded-full mr-2" style={{ backgroundColor: typePoste.couleur }}></div>
-                    <span className={`font-medium ${getTextColorClass(true)}`}>{translations.color || "Couleur"}:</span> {typePoste.couleur}
-                  </p>
-                )}
-              </div>
-
-              {/* Plans Tarifaires (affichage simple) */}
-              {typePoste.plansTarifaires && typePoste.plansTarifaires.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-dashed border-gray-600">
-                  <h4 className={`text-sm font-semibold mb-2 ${getTextColorClass(true)}`}>{translations.pricingPlans || "Plans Tarifaires"}:</h4>
-                  <ul className="space-y-1">
-                    {typePoste.plansTarifaires.map((plan, idx) => (
-                      <li key={idx} className={`text-xs ${getTextColorClass(false)} flex items-center`}>
-                        <Clock size={12} className="mr-1 text-gray-400" />
-                        {plan.dureeMinutes} {translations.minutes || "min"} : {plan.prix}€
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className={`flex justify-end items-center pt-3 border-t ${getBorderColorClass()} mt-4`}>
-                <div className="flex space-x-2">
-                  {canManageTypesPostes && (
-                    <>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        onClick={() => openEditTypePosteForm(typePoste)}
-                        title={translations.edit || "Modifier"}
-                      >
-                        <Edit3 size={16} />
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="danger"
-                        onClick={() => openDeleteDialog(typePoste)}
-                        title={translations.delete || "Supprimer"}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredTypesPostes.map(typePoste => (
+            <TypePosteCard
+              key={typePoste.id}
+              typePoste={typePoste}
+              onEdit={() => handleOpenForm(typePoste)}
+              onDelete={() => setTypePosteToDelete(typePoste)}
+              onShowStatistics={() => handleShowStatistics(typePoste)}
+              formatCurrency={formatCurrency}
+              translations={translations}
+              themeClasses={{
+                getBgColorClass,
+                getBorderColorClass,
+                getTextColorClass,
+                getButtonBgClass,
+                getButtonHoverBgClass
+              }}
+            />
           ))}
         </div>
       )}
 
-      {/* Formulaire de type de poste */}
-      {showTypePosteForm && (
+      {/* Formulaire modal */}
+      {isFormOpen && (
         <TypePosteForm
-          typePoste={editingTypePoste}
-          onClose={closeTypePosteForm}
+          typePoste={selectedTypePoste}
+          onClose={handleCloseForm}
         />
       )}
 
-      {/* Dialog de confirmation */}
+      {/* Statistiques détaillées */}
+      {showStatistics && (
+        <TypePosteStatistics
+          typePoste={showStatistics}
+          onClose={() => setShowStatistics(null)}
+        />
+      )}
+
+      {/* Calculateur de tarifs */}
+      {showCalculateur && (
+        <CalculateurTarifs
+          typesPostes={typesPostes}
+          onClose={() => setShowCalculateur(false)}
+        />
+      )}
+
+      {/* Dialogue de confirmation de suppression */}
       <ConfirmationDialog
-        isOpen={confirmDialog.show}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        onConfirm={confirmDeleteTypePoste}
-        onCancel={cancelDeleteTypePoste}
-        confirmText={translations.delete || "Supprimer"}
-        cancelText={translations.cancel || "Annuler"}
-        type="danger"
-        loading={deleteTypePosteMutation.isLoading}
+        isOpen={!!typePosteToDelete}
+        onClose={() => setTypePosteToDelete(null)}
+        onConfirm={handleDelete}
+        title={translations.deleteTypePoste || 'Supprimer le type de poste'}
+        message={
+          typePosteToDelete 
+            ? `${translations.deleteTypePosteConfirmation || 'Êtes-vous sûr de vouloir supprimer le type de poste'} "${typePosteToDelete.nom}" ?`
+            : ''
+        }
+        confirmButtonText={translations.delete || 'Supprimer'}
+        cancelButtonText={translations.cancel || 'Annuler'}
+        loading={deleteTypePosteMutation.isPending}
+        isDestructive={true}
+        additionalMessage={translations.deleteTypePosteConfirmationMessage || 'Cette action supprimera également tous les plans tarifaires associés'}
       />
+    </div>
+  );
+};
+
+// Composant de carte pour les types de postes
+const TypePosteCard = ({ 
+  typePoste, 
+  onEdit, 
+  onDelete, 
+  onShowStatistics,
+  formatCurrency, 
+  translations, 
+  themeClasses 
+}) => {
+  const { getBgColorClass, getBorderColorClass, getTextColorClass, getButtonBgClass, getButtonHoverBgClass } = themeClasses;
+
+  return (
+    <div className={`${getBgColorClass()} rounded-lg ${getBorderColorClass()} border overflow-hidden hover:shadow-lg transition-shadow`}>
+      {/* Header avec couleur */}
+      <div 
+        className="h-2" 
+        style={{ backgroundColor: typePoste.couleur || '#8b5cf6' }}
+      />
+      
+      <div className="p-6">
+        {/* En-tête */}
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-2">
+              {typePoste.icone && (
+                <span className="text-xl">{typePoste.icone}</span>
+              )}
+              <h3 className={`text-lg font-semibold ${getTextColorClass(true)}`}>
+                {typePoste.nom}
+              </h3>
+            </div>
+            <div className="flex items-center space-x-2">
+              <DollarSign size={16} className={getTextColorClass(false)} />
+              <span className={`font-medium ${getTextColorClass(true)}`}>
+                {formatCurrency(typePoste.tarifHoraireBase)}/h
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex space-x-2">
+            <button
+              onClick={() => onShowStatistics(typePoste)}
+              className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              title="Voir statistiques"
+            >
+              <span className="text-xs">📊</span>
+            </button>
+            <button
+              onClick={onEdit}
+              className={`p-2 ${getButtonBgClass()} ${getButtonHoverBgClass()} text-white rounded-lg transition-colors`}
+              title={translations.edit || 'Modifier'}
+            >
+              <Edit2 size={16} />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              title={translations.delete || 'Supprimer'}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Description */}
+        {typePoste.description && (
+          <p className={`text-sm ${getTextColorClass(false)} mb-4 line-clamp-2`}>
+            {typePoste.description}
+          </p>
+        )}
+
+        {/* Plans tarifaires */}
+        <div className="space-y-2">
+          <h4 className={`text-sm font-medium ${getTextColorClass(true)} flex items-center`}>
+            <Users size={14} className="mr-1" />
+            {translations.pricingPlans || 'Plans tarifaires'}
+          </h4>
+          
+          {typePoste.plansTarifaires && typePoste.plansTarifaires.length > 0 ? (
+            <div className="space-y-1">
+              {typePoste.plansTarifaires.slice(0, 3).map((plan, index) => (
+                <div key={index} className="flex justify-between items-center text-sm">
+                  <span className={getTextColorClass(false)}>
+                    {plan.nom || `${plan.dureeMinutes} ${translations.minutes || 'min'}`}
+                  </span>
+                  <span className={`font-medium ${getTextColorClass(true)}`}>
+                    {formatCurrency(plan.prix)}
+                  </span>
+                </div>
+              ))}
+              {typePoste.plansTarifaires.length > 3 && (
+                <div className={`text-xs ${getTextColorClass(false)}`}>
+                  +{typePoste.plansTarifaires.length - 3} autre{typePoste.plansTarifaires.length > 4 ? 's' : ''}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className={`text-xs ${getTextColorClass(false)}`}>
+              {translations.noPricingPlans || 'Aucun plan tarifaire'}
+            </p>
+          )}
+        </div>
+
+        {/* Status */}
+        <div className="mt-4 pt-4 border-t border-opacity-20">
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+            typePoste.estActif 
+              ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' 
+              : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'
+          }`}>
+            {typePoste.estActif 
+              ? (translations.active || 'Actif') 
+              : (translations.inactive || 'Inactif')
+            }
+          </span>
+        </div>
+      </div>
     </div>
   );
 };

@@ -13,6 +13,7 @@ const PostesPage = lazy(() => import('./pages/Postes/Postes'));
 const RolesPage = lazy(() => import('./pages/Roles/Roles'));
 const PermissionsPage = lazy(() => import('./pages/Permissions/Permissions'));
 const Notifications = lazy(() => import('./pages/Notifications/Notifications'));
+const TypesPostesPage = lazy(() => import('./pages/Postes/TypesPostes'));
 
 // Préchargez les modules de manière progressive
 const preloadRoutes = () => {
@@ -47,6 +48,12 @@ const AppRoutes = () => {
         <Route path="/postes" element={
           hasPermission('POSTES_VIEW') 
             ? <PostesPage /> 
+            : <Navigate to="/" replace />
+        } />
+        
+        <Route path="/postes/types" element={
+          hasPermission('POSTES_MANAGE') 
+            ? <TypesPostesPage /> 
             : <Navigate to="/" replace />
         } />
         

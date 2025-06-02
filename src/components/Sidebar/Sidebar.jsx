@@ -14,13 +14,17 @@ import {
   Calendar,
   BarChart3,
   DollarSign,
-  ClipboardList
+  ClipboardList,
+  ChevronDown,
+  ChevronRight,
+  Gamepad2
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState({});
   const { user, logout, hasPermission } = useAuth();
   const { translations } = useLanguage();
   const navigate = useNavigate();
@@ -31,13 +35,25 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     if (user) {
       console.log('👤 Utilisateur sidebar:', user);
       console.log('🔑 Permissions:', user.role?.permissions);
-      console.log('✅ Test ROLES_MANAGE:', hasPermission('ROLES_MANAGE'));
-      console.log('✅ Test PERMISSIONS_MANAGE:', hasPermission('PERMISSIONS_MANAGE'));
-      console.log('✅ Test USERS_ADMIN:', hasPermission('USERS_ADMIN'));
-      console.log('✅ Test FINANCE_VIEW:', hasPermission('FINANCE_VIEW'));
-      console.log('✅ Test ADMIN:', hasPermission('ADMIN'));
+      console.log('✅ Test POSTES_VIEW:', hasPermission('POSTES_VIEW'));
+      console.log('✅ Test POSTES_MANAGE:', hasPermission('POSTES_MANAGE'));
     }
   }, [user, hasPermission]);
+
+  const shouldExpandVisual = expanded || (!isMobile && isHovered);
+
+  // Fonction pour basculer l'expansion d'un sous-menu
+  const toggleSubmenu = (menuKey) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [menuKey]: !prev[menuKey]
+    }));
+  };
+
+  // Vérifier si un menu parent est actif
+  const isParentActive = (parentPath, children) => {
+    return children.some(child => location.pathname === child.path) || location.pathname === parentPath;
+  };
 
   // Menu principal adapté selon les permissions utilisateur
   const menuItems = [
@@ -46,11 +62,28 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
       label: translations.home || 'Accueil', 
       path: '/dashboard' 
     },
-    { 
-      icon: <Monitor size={20} />, 
-      label: translations.gamingStations || 'Postes Gaming', 
+    // Menu Postes Gaming avec sous-menu
+    {
+      icon: <Monitor size={20} />,
+      label: translations.postes || 'Postes Gaming',
       path: '/dashboard/postes',
-      permission: 'POSTES_VIEW'
+      permission: 'POSTES_VIEW',
+      hasSubmenu: true,
+      submenuKey: 'postes',
+      children: [
+        {
+          icon: <Gamepad2 size={18} />,
+          label: translations.postes || 'Postes',
+          path: '/dashboard/postes',
+          permission: 'POSTES_VIEW'
+        },
+        {
+          icon: <Settings size={18} />,
+          label: translations.typesPostes || 'Types de Postes',
+          path: '/dashboard/postes/types',
+          permission: 'POSTES_MANAGE'
+        }
+      ]
     },
     { 
       icon: <UserPlus size={20} />, 
@@ -79,9 +112,18 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
   ];
 
   // Filtrer les éléments du menu principal selon les permissions
-  const filteredMenuItems = menuItems.filter(item => 
-    !item.permission || hasPermission(item.permission) || hasPermission('ADMIN')
-  );
+  const filteredMenuItems = menuItems.filter(item => {
+    if (!item.permission) return true;
+    
+    // Pour les menus avec sous-menus, vérifier si au moins un enfant est accessible
+    if (item.hasSubmenu && item.children) {
+      return item.children.some(child => 
+        !child.permission || hasPermission(child.permission) || hasPermission('ADMIN')
+      );
+    }
+    
+    return hasPermission(item.permission) || hasPermission('ADMIN');
+  });
 
   // Menu administration - avec permissions corrigées et fallback ADMIN
   const adminMenuItems = [
@@ -128,8 +170,6 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     }] : [])
   ];
 
-  const shouldExpandVisual = expanded || (!isMobile && isHovered);
-
   const handleNavigation = (e, path) => {
     e.preventDefault();
     
@@ -151,14 +191,121 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     }
   };
 
+  // Auto-expand les sous-menus si la page active est dedans
+  useEffect(() => {
+    filteredMenuItems.forEach(item => {
+      if (item.hasSubmenu && item.children) {
+        const isChildActive = item.children.some(child => location.pathname === child.path);
+        if (isChildActive && !expandedMenus[item.submenuKey]) {
+          setExpandedMenus(prev => ({
+            ...prev,
+            [item.submenuKey]: true
+          }));
+        }
+      }
+    });
+  }, [location.pathname]);
+
   // Styles fixes pour le sidebar (toujours thème sombre)
   const sidebarBg = 'rgba(30, 41, 59, 0.9)';
   const sidebarBorder = 'border-purple-400/20';
   const linkTextColor = 'text-gray-300';
   const linkHoverBg = 'hover:bg-purple-600/20';
   const linkActiveBg = 'bg-purple-600/80 text-white shadow-lg';
+  const submenuBg = 'bg-slate-800/50';
+  const submenuItemBg = 'hover:bg-purple-600/10';
   const adminSectionBorder = 'border-purple-400/20';
   const adminSectionTitleColor = 'text-gray-400';
+
+  const renderMenuItem = (item, index) => {
+    if (!item.hasSubmenu) {
+      // Menu simple
+      return (
+        <li key={index}>
+          <Link
+            to={item.path}
+            className={`
+              flex items-center py-3 px-3 rounded-lg
+              ${location.pathname === item.path || 
+                (location.pathname === '/dashboard' && item.path === '/dashboard') ? 
+                linkActiveBg : 
+                `${linkTextColor} ${linkHoverBg}`}
+              transition-all duration-200
+              ${!shouldExpandVisual && 'justify-center'}
+            `}
+            title={!shouldExpandVisual ? item.label : ''}
+            onClick={(e) => handleNavigation(e, item.path)}
+          >
+            <span className="flex-shrink-0">{item.icon}</span>
+            {shouldExpandVisual && <span className="ml-3 font-medium">{item.label}</span>}
+          </Link>
+        </li>
+      );
+    }
+
+    // Menu avec sous-menu
+    const isActive = isParentActive(item.path, item.children);
+    const isExpanded = expandedMenus[item.submenuKey];
+    const accessibleChildren = item.children.filter(child => 
+      !child.permission || hasPermission(child.permission) || hasPermission('ADMIN')
+    );
+
+    return (
+      <li key={index}>
+        {/* Parent menu item */}
+        <div
+          className={`
+            flex items-center py-3 px-3 rounded-lg cursor-pointer
+            ${isActive ? linkActiveBg : `${linkTextColor} ${linkHoverBg}`}
+            transition-all duration-200
+            ${!shouldExpandVisual && 'justify-center'}
+          `}
+          onClick={() => {
+            if (shouldExpandVisual) {
+              toggleSubmenu(item.submenuKey);
+            } else {
+              handleNavigation({ preventDefault: () => {} }, item.path);
+            }
+          }}
+          title={!shouldExpandVisual ? item.label : ''}
+        >
+          <span className="flex-shrink-0">{item.icon}</span>
+          {shouldExpandVisual && (
+            <>
+              <span className="ml-3 font-medium flex-1">{item.label}</span>
+              <span className="ml-2 flex-shrink-0">
+                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* Sous-menu */}
+        {shouldExpandVisual && isExpanded && accessibleChildren.length > 0 && (
+          <ul className={`ml-4 mt-1 space-y-1 ${submenuBg} rounded-lg p-2`}>
+            {accessibleChildren.map((child, childIndex) => (
+              <li key={childIndex}>
+                <Link
+                  to={child.path}
+                  className={`
+                    flex items-center py-2 px-3 rounded-md text-sm
+                    ${location.pathname === child.path ? 
+                      linkActiveBg : 
+                      `${linkTextColor} ${submenuItemBg}`}
+                    transition-all duration-200
+                  `}
+                  onClick={(e) => handleNavigation(e, child.path)}
+                >
+                  <span className="flex-shrink-0">{child.icon}</span>
+                  <span className="ml-3">{child.label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </li>
+    );
+  };
 
   return (
     <>
@@ -187,27 +334,7 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
           {/* Menu général */}
           <div className="px-3">
             <ul className="space-y-1">
-              {filteredMenuItems.map((item, index) => (
-                <li key={index}>
-                  <Link
-                    to={item.path}
-                    className={`
-                      flex items-center py-3 px-3 rounded-lg
-                      ${location.pathname === item.path || 
-                        (location.pathname === '/dashboard' && item.path === '/dashboard') ? 
-                        linkActiveBg : 
-                        `${linkTextColor} ${linkHoverBg}`}
-                      transition-all duration-200
-                      ${!shouldExpandVisual && 'justify-center'}
-                    `}
-                    title={!shouldExpandVisual ? item.label : ''}
-                    onClick={(e) => handleNavigation(e, item.path)}
-                  >
-                    <span className="flex-shrink-0">{item.icon}</span>
-                    {shouldExpandVisual && <span className="ml-3 font-medium">{item.label}</span>}
-                  </Link>
-                </li>
-              ))}
+              {filteredMenuItems.map((item, index) => renderMenuItem(item, index))}
             </ul>
           </div>
 
@@ -251,8 +378,8 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
           )}
         </nav>
 
-        {/* Section inférieure - Déconnexion */}
-      
+          {/* Section inférieure - Déconnexion */}
+        
       </aside>
 
       {/* Overlay pour mobile */}
