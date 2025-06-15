@@ -1,0 +1,1395 @@
+Collecte des informations sur l’espace de travailJe vais vous aider à implémenter les fonctionnalités manquantes pour compléter votre Gaming Center frontend. En analysant votre structure existante et la documentation, voici les implémentations nécessaires :
+
+## 1. Service Abonnements complet
+
+````javascript
+import { api } from '../api/apiService';
+
+class AbonnementService {
+  /**
+   * Récupérer tous les abonnements
+   */
+  async getAllAbonnements(params = {}) {
+    try {
+      console.log('🎯 [ABONNEMENT_SERVICE] Récupération abonnements:', params);
+      
+      const response = await api.get('/abonnements', { params });
+      console.log('✅ [ABONNEMENT_SERVICE] Abonnements récupérés:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ [ABONNEMENT_SERVICE] Erreur récupération abonnements:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupérer un abonnement par ID
+   */
+  async getAbonnementById(id) {
+    try {
+      console.log(`📋 [ABONNEMENT_SERVICE] Récupération abonnement ID: ${id}`);
+      
+      const response = await api.get(`/abonnements/${id}`);
+      console.log('✅ [ABONNEMENT_SERVICE] Abonnement récupéré:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ [ABONNEMENT_SERVICE] Erreur récupération abonnement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Vendre un abonnement
+   */
+  async vendreAbonnement(abonnementData) {
+    try {
+      console.log('💰 [ABONNEMENT_SERVICE] Vente abonnement:', abonnementData);
+      
+      // Validation des données
+      if (!abonnementData.clientId || !abonnementData.typeAbonnementId || !abonnementData.modePaiement) {
+        throw new Error('Données de vente incomplètes');
+      }
+
+      const response = await api.post('/abonnements', abonnementData);
+      console.log('✅ [ABONNEMENT_SERVICE] Abonnement vendu:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ [ABONNEMENT_SERVICE] Erreur vente abonnement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Suspendre/Réactiver un abonnement
+   */
+  async changerStatutAbonnement(id, action, raison = '') {
+    try {
+      console.log(`⏸️ [ABONNEMENT_SERVICE] Changement statut abonnement ID: ${id}`, { action, raison });
+      
+      // Validation
+      if (!['SUSPENDRE', 'REACTIVER'].includes(action)) {
+        throw new Error('Action non valide');
+      }
+      
+      if (action === 'SUSPENDRE' && !raison.trim()) {
+        throw new Error('Une raison est requise pour suspendre un abonnement');
+      }
+      
+      const response = await api.patch(`/abonnements/${id}/status`, {
+        action,
+        raison: raison.trim()
+      });
+      console.log('✅ [ABONNEMENT_SERVICE] Statut changé:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ [ABONNEMENT_SERVICE] Erreur changement statut:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupérer les statistiques d'un abonnement
+   */
+  async getAbonnementStatistiques(id) {
+    try {
+      console.log(`📊 [ABONNEMENT_SERVICE] Récupération stats abonnement ID: ${id}`);
+      
+      const response = await api.get(`/abonnements/${id}/statistiques`);
+      console.log('✅ [ABONNEMENT_SERVICE] Stats récupérées:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ [ABONNEMENT_SERVICE] Erreur récupération stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupérer les abonnements actifs d'un client
+   */
+  async getAbonnementsActifsClient(clientId) {
+    try {
+      console.log(`👤 [ABONNEMENT_SERVICE] Récupération abonnements actifs client ID: ${clientId}`);
+      
+      const response = await api.get('/abonnements', {
+        params: {
+          clientId,
+          statut: 'ACTIF',
+          includeExpired: false
+        }
+      });
+      console.log('✅ [ABONNEMENT_SERVICE] Abonnements actifs récupérés:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ [ABONNEMENT_SERVICE] Erreur récupération abonnements actifs:', error);
+      throw error;
+    }
+  }
+}
+
+export const abonnementService = new AbonnementService();
+export default abonnementService;
+````
+
+## 2. Hooks pour les abonnements
+
+````javascript
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import abonnementService from '../services/abonnementService';
+import { useNotification } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
+
+export function useAbonnements(filters = {}) {
+  const { showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useQuery({
+    queryKey: ['abonnements', filters],
+    queryFn: () => abonnementService.getAllAbonnements(filters),
+    staleTime: 60000, // 1 minute
+    onError: (error) => {
+      console.error('Erreur lors de la récupération des abonnements:', error);
+      showError(error.message || translations?.errorLoadingSubscriptions || 'Erreur lors du chargement des abonnements');
+    }
+  });
+}
+
+export function useAbonnement(abonnementId) {
+  const { showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useQuery({
+    queryKey: ['abonnement', abonnementId],
+    queryFn: () => abonnementService.getAbonnementById(abonnementId),
+    enabled: !!abonnementId,
+    onError: (error) => {
+      console.error('Erreur lors de la récupération de l\'abonnement:', error);
+      showError(error.message || translations?.errorLoadingSubscription || 'Erreur lors du chargement de l\'abonnement');
+    }
+  });
+}
+
+export function useAbonnementsClient(clientId) {
+  const { showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useQuery({
+    queryKey: ['abonnements', 'client', clientId],
+    queryFn: () => abonnementService.getAbonnementsActifsClient(clientId),
+    enabled: !!clientId,
+    staleTime: 30000, // 30 secondes
+    onError: (error) => {
+      console.error('Erreur lors de la récupération des abonnements du client:', error);
+      showError(error.message || translations?.errorLoadingClientSubscriptions || 'Erreur lors du chargement des abonnements du client');
+    }
+  });
+}
+
+export function useVendreAbonnement() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useMutation({
+    mutationFn: (abonnementData) => abonnementService.vendreAbonnement(abonnementData),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['abonnements'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      showSuccess(data.message || translations?.subscriptionSoldSuccess || 'Abonnement vendu avec succès');
+    },
+    onError: (error) => {
+      console.error('Erreur lors de la vente de l\'abonnement:', error);
+      showError(error.message || translations?.errorSellingSubscription || 'Erreur lors de la vente de l\'abonnement');
+    }
+  });
+}
+
+export function useChangerStatutAbonnement() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useMutation({
+    mutationFn: ({ id, action, raison }) => abonnementService.changerStatutAbonnement(id, action, raison),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['abonnements'] });
+      queryClient.invalidateQueries({ queryKey: ['abonnement', variables.id] });
+      
+      const message = variables.action === 'SUSPENDRE' 
+        ? (translations?.subscriptionSuspendedSuccess || 'Abonnement suspendu avec succès')
+        : (translations?.subscriptionReactivatedSuccess || 'Abonnement réactivé avec succès');
+      
+      showSuccess(data.message || message);
+    },
+    onError: (error) => {
+      console.error('Erreur lors du changement de statut:', error);
+      showError(error.message || translations?.errorChangingSubscriptionStatus || 'Erreur lors du changement de statut');
+    }
+  });
+}
+
+export function useAbonnementStatistiques(abonnementId) {
+  const { showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useQuery({
+    queryKey: ['abonnement', abonnementId, 'statistiques'],
+    queryFn: () => abonnementService.getAbonnementStatistiques(abonnementId),
+    enabled: !!abonnementId,
+    staleTime: 300000, // 5 minutes
+    onError: (error) => {
+      console.error('Erreur lors de la récupération des statistiques:', error);
+      showError(error.message || translations?.errorLoadingStats || 'Erreur lors du chargement des statistiques');
+    }
+  });
+}
+````
+
+## 3. Hooks pour les types d'abonnements
+
+````javascript
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import typeAbonnementService from '../services/typeAbonnementService';
+import { useNotification } from '../contexts/NotificationContext';
+import { useLanguage } from '../contexts/LanguageContext';
+
+export function useTypesAbonnements(params = {}) {
+  const { showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useQuery({
+    queryKey: ['typesAbonnements', params],
+    queryFn: () => typeAbonnementService.getAllTypesAbonnements(params),
+    staleTime: 300000, // 5 minutes
+    onError: (error) => {
+      console.error('Erreur lors de la récupération des types d\'abonnements:', error);
+      showError(error.message || translations?.errorLoadingSubscriptionTypes || 'Erreur lors du chargement des types d\'abonnements');
+    }
+  });
+}
+
+export function useTypeAbonnement(typeId) {
+  const { showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useQuery({
+    queryKey: ['typeAbonnement', typeId],
+    queryFn: () => typeAbonnementService.getTypeAbonnementById(typeId),
+    enabled: !!typeId,
+    onError: (error) => {
+      console.error('Erreur lors de la récupération du type d\'abonnement:', error);
+      showError(error.message || translations?.errorLoadingSubscriptionType || 'Erreur lors du chargement du type d\'abonnement');
+    }
+  });
+}
+
+export function useCreateTypeAbonnement() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useMutation({
+    mutationFn: (typeData) => typeAbonnementService.createTypeAbonnement(typeData),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['typesAbonnements'] });
+      showSuccess(data.message || translations?.subscriptionTypeCreatedSuccess || 'Type d\'abonnement créé avec succès');
+    },
+    onError: (error) => {
+      console.error('Erreur lors de la création du type d\'abonnement:', error);
+      showError(error.message || translations?.errorCreatingSubscriptionType || 'Erreur lors de la création du type d\'abonnement');
+    }
+  });
+}
+
+export function useUpdateTypeAbonnement() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useMutation({
+    mutationFn: ({ id, data }) => typeAbonnementService.updateTypeAbonnement(id, data),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['typesAbonnements'] });
+      queryClient.invalidateQueries({ queryKey: ['typeAbonnement', variables.id] });
+      showSuccess(data.message || translations?.subscriptionTypeUpdatedSuccess || 'Type d\'abonnement mis à jour avec succès');
+    },
+    onError: (error) => {
+      console.error('Erreur lors de la mise à jour du type d\'abonnement:', error);
+      showError(error.message || translations?.errorUpdatingSubscriptionType || 'Erreur lors de la mise à jour du type d\'abonnement');
+    }
+  });
+}
+
+export function useDeleteTypeAbonnement() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useMutation({
+    mutationFn: (id) => typeAbonnementService.deleteTypeAbonnement(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['typesAbonnements'] });
+      showSuccess(data.message || translations?.subscriptionTypeDeletedSuccess || 'Type d\'abonnement supprimé avec succès');
+    },
+    onError: (error) => {
+      console.error('Erreur lors de la suppression du type d\'abonnement:', error);
+      showError(error.message || translations?.errorDeletingSubscriptionType || 'Erreur lors de la suppression du type d\'abonnement');
+    }
+  });
+}
+````
+
+## 4. Page Types d'Abonnements
+
+````jsx
+import React, { useState } from 'react';
+import { useTypesAbonnements, useDeleteTypeAbonnement } from '../../hooks/useTypesAbonnements';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { 
+  Package, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Eye,
+  Clock,
+  Euro,
+  Users,
+  TrendingUp,
+  Calendar,
+  Star,
+  Zap
+} from 'lucide-react';
+import TypeAbonnementForm from './TypeAbonnementForm';
+import ConfirmationDialog from '../../components/ConfirmationDialog/ConfirmationDialog';
+
+const TypesAbonnements = () => {
+  const [showForm, setShowForm] = useState(false);
+  const [editingType, setEditingType] = useState(null);
+  const [typeToDelete, setTypeToDelete] = useState(null);
+  const [filters, setFilters] = useState({
+    includeInactive: false,
+    estPromo: null,
+    orderBy: 'ordre'
+  });
+
+  const { hasPermission } = useAuth();
+  const { effectiveTheme } = useTheme();
+  const { translations } = useLanguage();
+
+  const isDarkMode = effectiveTheme === 'dark';
+
+  const { data: typesData = [], isLoading, isError, error } = useTypesAbonnements(filters);
+  const { mutate: deleteType } = useDeleteTypeAbonnement();
+
+  // Permissions
+  const canViewTypes = hasPermission('ABONNEMENTS_VIEW');
+  const canManageTypes = hasPermission('ABONNEMENTS_MANAGE');
+
+  const typesAbonnements = typesData?.data || [];
+
+  // Styles dynamiques
+  const getTextColorClass = (isPrimary) => 
+    isDarkMode ? (isPrimary ? 'text-white' : 'text-gray-300') : (isPrimary ? 'text-gray-900' : 'text-gray-600');
+  
+  const getBgColorClass = () => 
+    isDarkMode ? 'bg-gray-800' : 'bg-white';
+  
+  const getBorderColorClass = () => 
+    isDarkMode ? 'border-gray-700' : 'border-gray-200';
+
+  // Gestionnaires d'événements
+  const openAddForm = () => {
+    setEditingType(null);
+    setShowForm(true);
+  };
+
+  const openEditForm = (type) => {
+    setEditingType(type);
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingType(null);
+  };
+
+  const handleDelete = () => {
+    if (typeToDelete) {
+      deleteType(typeToDelete.id);
+      setTypeToDelete(null);
+    }
+  };
+
+  if (!canViewTypes) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <Package className="mx-auto h-12 w-12 text-gray-400" />
+          <h2 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+            Accès refusé
+          </h2>
+          <p className="mt-2 text-gray-500 dark:text-gray-400">
+            Vous n'avez pas les permissions pour consulter les types d'abonnements.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      {/* En-tête */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-2xl font-bold ${getTextColorClass(true)} flex items-center`}>
+              <Package className="mr-3 text-purple-600" />
+              {translations?.subscriptionTypes || 'Types d\'abonnements'}
+            </h1>
+            <p className={`mt-2 ${getTextColorClass(false)}`}>
+              {translations?.subscriptionTypesDescription || 'Gestion des forfaits et packages d\'abonnements'}
+            </p>
+          </div>
+          
+          {canManageTypes && (
+            <button
+              onClick={openAddForm}
+              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {translations?.addSubscriptionType || 'Nouveau type'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filtres */}
+      <div className={`${getBgColorClass()} ${getBorderColorClass()} border rounded-lg p-4 mb-6`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="includeInactive"
+              checked={filters.includeInactive}
+              onChange={(e) => setFilters(prev => ({ ...prev, includeInactive: e.target.checked }))}
+              className="mr-2"
+            />
+            <label htmlFor="includeInactive" className={getTextColorClass(false)}>
+              {translations?.includeInactive || 'Inclure inactifs'}
+            </label>
+          </div>
+
+          <select
+            value={filters.estPromo || ''}
+            onChange={(e) => setFilters(prev => ({ ...prev, estPromo: e.target.value ? e.target.value === 'true' : null }))}
+            className={`px-4 py-2 border ${getBorderColorClass()} rounded-lg ${getBgColorClass()} ${getTextColorClass(true)}`}
+          >
+            <option value="">{translations?.allTypes || 'Tous les types'}</option>
+            <option value="true">{translations?.promotions || 'Promotions'}</option>
+            <option value="false">{translations?.regular || 'Réguliers'}</option>
+          </select>
+
+          <select
+            value={filters.orderBy}
+            onChange={(e) => setFilters(prev => ({ ...prev, orderBy: e.target.value }))}
+            className={`px-4 py-2 border ${getBorderColorClass()} rounded-lg ${getBgColorClass()} ${getTextColorClass(true)}`}
+          >
+            <option value="ordre">{translations?.orderByDisplay || 'Ordre d\'affichage'}</option>
+            <option value="prix">{translations?.orderByPrice || 'Par prix'}</option>
+            <option value="heures">{translations?.orderByHours || 'Par heures'}</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Liste des types */}
+      {isLoading ? (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        </div>
+      ) : isError ? (
+        <div className="p-4 bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-lg">
+          <p>{translations?.errorLoadingSubscriptionTypes || 'Erreur lors du chargement des types d\'abonnements'}: {error.message}</p>
+        </div>
+      ) : typesAbonnements.length === 0 ? (
+        <div className={`${getBgColorClass()} rounded-lg p-8 text-center`}>
+          <Package className={`mx-auto h-12 w-12 ${getTextColorClass(false)} mb-4`} />
+          <p className={getTextColorClass(false)}>
+            {translations?.noSubscriptionTypesFound || 'Aucun type d\'abonnement trouvé.'}
+            {canManageTypes && ` ${translations?.startByAddingOne || 'Commencez par en créer un !'}`}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {typesAbonnements.map((type) => (
+            <TypeAbonnementCard 
+              key={type.id} 
+              type={type}
+              onEdit={canManageTypes ? () => openEditForm(type) : null}
+              onDelete={canManageTypes ? () => setTypeToDelete(type) : null}
+              getTextColorClass={getTextColorClass}
+              getBgColorClass={getBgColorClass}
+              getBorderColorClass={getBorderColorClass}
+              translations={translations}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Formulaire */}
+      {showForm && (
+        <TypeAbonnementForm
+          type={editingType}
+          onClose={closeForm}
+        />
+      )}
+
+      {/* Dialogue de confirmation de suppression */}
+      <ConfirmationDialog
+        isOpen={!!typeToDelete}
+        onClose={() => setTypeToDelete(null)}
+        onConfirm={handleDelete}
+        title={translations?.deleteSubscriptionType || 'Supprimer le type d\'abonnement'}
+        message={`${translations?.confirmDeleteSubscriptionType || 'Êtes-vous sûr de vouloir supprimer le type'} "${typeToDelete?.nom}" ?`}
+        confirmButtonText={translations?.delete || 'Supprimer'}
+        cancelButtonText={translations?.cancel || 'Annuler'}
+      />
+    </div>
+  );
+};
+
+// Composant de carte type d'abonnement
+const TypeAbonnementCard = ({ type, onEdit, onDelete, getTextColorClass, getBgColorClass, getBorderColorClass, translations }) => {
+  const getTypeColor = (type) => {
+    if (type.estPromo) return type.couleur || '#F59E0B';
+    return type.couleur || '#3B82F6';
+  };
+
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: 'MAD'
+    }).format(price);
+  };
+
+  return (
+    <div className={`${getBgColorClass()} ${getBorderColorClass()} border rounded-lg p-6 hover:shadow-lg transition-shadow relative overflow-hidden`}>
+      {/* Badge de promotion */}
+      {type.estPromo && (
+        <div className="absolute top-0 right-0 bg-gradient-to-l from-yellow-400 to-yellow-600 text-white px-3 py-1 text-xs font-bold rounded-bl-lg">
+          <Star className="w-3 h-3 inline mr-1" />
+          PROMO
+        </div>
+      )}
+
+      {/* En-tête colorée */}
+      <div 
+        className="h-2 w-full rounded-lg mb-4"
+        style={{ backgroundColor: getTypeColor(type) }}
+      />
+
+      {/* Titre et description */}
+      <div className="mb-4">
+        <h3 className={`text-xl font-bold ${getTextColorClass(true)} mb-2`}>
+          {type.nom}
+        </h3>
+        {type.description && (
+          <p className={`text-sm ${getTextColorClass(false)}`}>
+            {type.description}
+          </p>
+        )}
+      </div>
+
+      {/* Prix principal */}
+      <div className="text-center mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        <div className={`text-3xl font-bold ${getTextColorClass(true)}`}>
+          {formatPrice(type.prixPackage)}
+        </div>
+        <div className={`text-sm ${getTextColorClass(false)}`}>
+          pour {type.nombreHeures}h
+        </div>
+        {type.pourcentageReduction > 0 && (
+          <div className="text-green-600 text-sm font-medium mt-1">
+            -{type.pourcentageReduction}% d'économie
+          </div>
+        )}
+      </div>
+
+      {/* Détails */}
+      <div className="space-y-3 mb-4">
+        <div className="flex items-center justify-between">
+          <span className={`text-sm ${getTextColorClass(false)} flex items-center`}>
+            <Euro className="w-4 h-4 mr-2" />
+            Prix/heure
+          </span>
+          <span className={`text-sm font-medium ${getTextColorClass(true)}`}>
+            {formatPrice(type.prixHoraireEquivalent)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className={`text-sm ${getTextColorClass(false)} flex items-center`}>
+            <Clock className="w-4 h-4 mr-2" />
+            Validité
+          </span>
+          <span className={`text-sm font-medium ${getTextColorClass(true)}`}>
+            {type.dureeValiditeMois} mois
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className={`text-sm ${getTextColorClass(false)} flex items-center`}>
+            <Zap className="w-4 h-4 mr-2" />
+            Session min/max
+          </span>
+          <span className={`text-sm font-medium ${getTextColorClass(true)}`}>
+            {type.heuresMinParSession}h - {type.heuresMaxParSession || '∞'}h
+          </span>
+        </div>
+
+        {type.nombreVentes > 0 && (
+          <div className="flex items-center justify-between">
+            <span className={`text-sm ${getTextColorClass(false)} flex items-center`}>
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Ventes
+            </span>
+            <span className={`text-sm font-medium ${getTextColorClass(true)}`}>
+              {type.nombreVentes}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Status */}
+      <div className="mb-4">
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          type.estActif 
+            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+        }`}>
+          {type.estActif ? (translations?.active || 'Actif') : (translations?.inactive || 'Inactif')}
+        </span>
+      </div>
+
+      {/* Actions */}
+      <div className="flex space-x-2">
+        <button className={`flex-1 flex items-center justify-center px-3 py-2 text-sm border ${getBorderColorClass()} rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}>
+          <Eye className="w-4 h-4 mr-1" />
+          {translations?.view || 'Voir'}
+        </button>
+        
+        {onEdit && (
+          <button 
+            onClick={onEdit}
+            className="flex-1 flex items-center justify-center px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Edit className="w-4 h-4 mr-1" />
+            {translations?.edit || 'Modifier'}
+          </button>
+        )}
+        
+        {onDelete && (
+          <button 
+            onClick={onDelete}
+            className="flex items-center justify-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default TypesAbonnements;
+````
+
+## 5. Page Abonnements
+
+````jsx
+import React, { useState } from 'react';
+import { useAbonnements, useChangerStatutAbonnement } from '../../hooks/useAbonnements';
+import { useClients } from '../../hooks/useClients';
+import { useTypesAbonnements } from '../../hooks/useTypesAbonnements';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { 
+  CreditCard, 
+  Search, 
+  Plus, 
+  Filter,
+  Download,
+  Calendar,
+  Clock,
+  User,
+  Package,
+  Pause,
+  Play,
+  BarChart3,
+  AlertTriangle,
+  CheckCircle,
+  XCircle
+} from 'lucide-react';
+import VenteAbonnementForm from './VenteAbonnementForm';
+import ConfirmationDialog from '../../components/ConfirmationDialog/ConfirmationDialog';
+
+const Abonnements = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    statut: '',
+    clientId: '',
+    typeAbonnementId: '',
+    includeExpired: false,
+    page: 1,
+    limit: 20
+  });
+  const [showVenteForm, setShowVenteForm] = useState(false);
+  const [actionData, setActionData] = useState(null);
+  const [raison, setRaison] = useState('');
+
+  const { hasPermission } = useAuth();
+  const { effectiveTheme } = useTheme();
+  const { translations } = useLanguage();
+
+  const isDarkMode = effectiveTheme === 'dark';
+
+  // Construire les filtres complets
+  const completeFilters = {
+    ...filters,
+    search: searchTerm
+  };
+
+  const { data: abonnementsData, isLoading, isError, error } = useAbonnements(completeFilters);
+  const { data: clientsData } = useClients({ includeInactive: false, limit: 100 });
+  const { data: typesData } = useTypesAbonnements({ includeInactive: false });
+  const { mutate: changerStatut } = useChangerStatutAbonnement();
+
+  // Permissions
+  const canViewAbonnements = hasPermission('ABONNEMENTS_VIEW');
+  const canManageAbonnements = hasPermission('ABONNEMENTS_MANAGE');
+
+  const abonnements = abonnementsData?.data?.abonnements || [];
+  const pagination = abonnementsData?.data?.pagination || {};
+  const clients = clientsData?.data?.clients || [];
+  const typesAbonnements = typesData?.data || [];
+
+  // Styles dynamiques
+  const getTextColorClass = (isPrimary) => 
+    isDarkMode ? (isPrimary ? 'text-white' : 'text-gray-300') : (isPrimary ? 'text-gray-900' : 'text-gray-600');
+  
+  const getBgColorClass = () => 
+    isDarkMode ? 'bg-gray-800' : 'bg-white';
+  
+  const getBorderColorClass = () => 
+    isDarkMode ? 'border-gray-700' : 'border-gray-200';
+
+  // Gestionnaires d'événements
+  const handleChangerStatut = (abonnement, action) => {
+    setActionData({ abonnement, action });
+    setRaison('');
+  };
+
+  const confirmerChangementStatut = () => {
+    if (actionData) {
+      changerStatut({
+        id: actionData.abonnement.id,
+        action: actionData.action,
+        raison
+      });
+      setActionData(null);
+      setRaison('');
+    }
+  };
+
+  const getStatutColor = (statut) => {
+    switch (statut) {
+      case 'ACTIF': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'EXPIRE': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'EPUISE': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+      case 'SUSPENDU': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      case 'ANNULE': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    }
+  };
+
+  const getStatutIcon = (statut) => {
+    switch (statut) {
+      case 'ACTIF': return <CheckCircle className="w-4 h-4" />;
+      case 'EXPIRE': return <AlertTriangle className="w-4 h-4" />;
+      case 'EPUISE': return <BarChart3 className="w-4 h-4" />;
+      case 'SUSPENDU': return <Pause className="w-4 h-4" />;
+      case 'ANNULE': return <XCircle className="w-4 h-4" />;
+      default: return <Clock className="w-4 h-4" />;
+    }
+  };
+
+  if (!canViewAbonnements) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <CreditCard className="mx-auto h-12 w-12 text-gray-400" />
+          <h2 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
+            Accès refusé
+          </h2>
+          <p className="mt-2 text-gray-500 dark:text-gray-400">
+            Vous n'avez pas les permissions pour consulter les abonnements.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      {/* En-tête */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-2xl font-bold ${getTextColorClass(true)} flex items-center`}>
+              <CreditCard className="mr-3 text-purple-600" />
+              {translations?.subscriptions || 'Abonnements'}
+            </h1>
+            <p className={`mt-2 ${getTextColorClass(false)}`}>
+              {translations?.subscriptionsDescription || 'Gestion des abonnements clients actifs et historique'}
+            </p>
+          </div>
+          
+          {canManageAbonnements && (
+            <button
+              onClick={() => setShowVenteForm(true)}
+              className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {translations?.sellSubscription || 'Vendre un abonnement'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filtres */}
+      <div className={`${getBgColorClass()} ${getBorderColorClass()} border rounded-lg p-4 mb-6`}>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {/* Recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder={translations?.searchSubscriptions || 'Rechercher...'}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`pl-10 pr-4 py-2 w-full border ${getBorderColorClass()} rounded-lg ${getBgColorClass()} ${getTextColorClass(true)}`}
+            />
+          </div>
+
+          {/* Statut */}
+          <select
+            value={filters.statut}
+            onChange={(e) => setFilters(prev => ({ ...prev, statut: e.target.value }))}
+            className={`px-4 py-2 border ${getBorderColorClass()} rounded-lg ${getBgColorClass()} ${getTextColorClass(true)}`}
+          >
+            <option value="">{translations?.allStatuses || 'Tous les statuts'}</option>
+            <option value="ACTIF">{translations?.active || 'Actif'}</option>
+            <option value="EXPIRE">{translations?.expired || 'Expiré'}</option>
+            <option value="EPUISE">{translations?.depleted || 'Épuisé'}</option>
+            <option value="SUSPENDU">{translations?.suspended || 'Suspendu'}</option>
+            <option value="ANNULE">{translations?.cancelled || 'Annulé'}</option>
+          </select>
+
+          {/* Client */}
+          <select
+            value={filters.clientId}
+            onChange={(e) => setFilters(prev => ({ ...prev, clientId: e.target.value }))}
+            className={`px-4 py-2 border ${getBorderColorClass()} rounded-lg ${getBgColorClass()} ${getTextColorClass(true)}`}
+          >
+            <option value="">{translations?.allClients || 'Tous les clients'}</option>
+            {clients.map(client => (
+              <option key={client.id} value={client.id}>
+                {client.prenom} {client.nom}
+              </option>
+            ))}
+          </select>
+
+          {/* Type */}
+          <select
+            value={filters.typeAbonnementId}
+            onChange={(e) => setFilters(prev => ({ ...prev, typeAbonnementId: e.target.value }))}
+            className={`px-4 py-2 border ${getBorderColorClass()} rounded-lg ${getBgColorClass()} ${getTextColorClass(true)}`}
+          >
+            <option value="">{translations?.allTypes || 'Tous les types'}</option>
+            {typesAbonnements.map(type => (
+              <option key={type.id} value={type.id}>
+                {type.nom}
+              </option>
+            ))}
+          </select>
+
+          {/* Actions */}
+          <div className="flex space-x-2">
+            <button className={`flex items-center px-3 py-2 border ${getBorderColorClass()} rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}>
+              <Download className="w-4 h-4 mr-1" />
+              {translations?.export || 'Export'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Liste des abonnements */}
+      {isLoading ? (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+        </div>
+      ) : isError ? (
+        <div className="p-4 bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 rounded-lg">
+          <p>{translations?.errorLoadingSubscriptions || 'Erreur lors du chargement des abonnements'}: {error.message}</p>
+        </div>
+      ) : abonnements.length === 0 ? (
+        <div className={`${getBgColorClass()} rounded-lg p-8 text-center`}>
+          <CreditCard className={`mx-auto h-12 w-12 ${getTextColorClass(false)} mb-4`} />
+          <p className={getTextColorClass(false)}>
+            {translations?.noSubscriptionsFound || 'Aucun abonnement trouvé.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {abonnements.map((abonnement) => (
+            <AbonnementCard 
+              key={abonnement.id} 
+              abonnement={abonnement}
+              onSuspendre={canManageAbonnements ? () => handleChangerStatut(abonnement, 'SUSPENDRE') : null}
+              onReactiver={canManageAbonnements ? () => handleChangerStatut(abonnement, 'REACTIVER') : null}
+              getTextColorClass={getTextColorClass}
+              getBgColorClass={getBgColorClass}
+              getBorderColorClass={getBorderColorClass}
+              getStatutColor={getStatutColor}
+              getStatutIcon={getStatutIcon}
+              translations={translations}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pagination.totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <div className="flex space-x-2">
+            <button
+              disabled={filters.page <= 1}
+              onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
+              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-50"
+            >
+              {translations?.previous || 'Précédent'}
+            </button>
+            
+            <span className={`px-4 py-2 text-sm ${getTextColorClass(false)}`}>
+              Page {pagination.page} sur {pagination.totalPages}
+            </span>
+            
+            <button
+              disabled={filters.page >= pagination.totalPages}
+              onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
+              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg disabled:opacity-50"
+            >
+              {translations?.next || 'Suivant'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Formulaire de vente */}
+      {showVenteForm && (
+        <VenteAbonnementForm
+          onClose={() => setShowVenteForm(false)}
+        />
+      )}
+
+      {/* Dialogue de changement de statut */}
+      <ConfirmationDialog
+        isOpen={!!actionData}
+        onClose={() => setActionData(null)}
+        onConfirm={confirmerChangementStatut}
+        title={actionData?.action === 'SUSPENDRE' 
+          ? (translations?.suspendSubscription || 'Suspendre l\'abonnement')
+          : (translations?.reactivateSubscription || 'Réactiver l\'abonnement')
+        }
+        confirmButtonText={actionData?.action === 'SUSPENDRE' 
+          ? (translations?.suspend || 'Suspendre')
+          : (translations?.reactivate || 'Réactiver')
+        }
+        cancelButtonText={translations?.cancel || 'Annuler'}
+        customContent={actionData?.action === 'SUSPENDRE' && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {translations?.reason || 'Raison'} *
+            </label>
+            <textarea
+              value={raison}
+              onChange={(e) => setRaison(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-purple-500 focus:border-purple-500 dark:bg-gray-700 dark:text-white"
+              placeholder={translations?.enterReason || 'Entrez la raison de la suspension...'}
+              required
+            />
+          </div>
+        )}
+      />
+    </div>
+  );
+};
+
+// Composant de carte abonnement
+const AbonnementCard = ({ abonnement, onSuspendre, onReactiver, getTextColorClass, getBgColorClass, getBorderColorClass, getStatutColor, getStatutIcon, translations }) => {
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: 'MAD'
+    }).format(price);
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('fr-FR');
+  };
+
+  const calculerProgression = () => {
+    if (abonnement.nombreHeuresAchetees === 0) return 0;
+    return (abonnement.heuresUtilisees / abonnement.nombreHeuresAchetees) * 100;
+  };
+
+  const progression = calculerProgression();
+
+  return (
+    <div className={`${getBgColorClass()} ${getBorderColorClass()} border rounded-lg p-6 hover:shadow-lg transition-shadow`}>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Informations principales */}
+        <div className="lg:col-span-2">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className={`text-lg font-semibold ${getTextColorClass(true)}`}>
+                #{abonnement.numeroAbonnement}
+              </h3>
+              <p className={`text-sm ${getTextColorClass(false)}`}>
+                {abonnement.typeAbonnement?.nom}
+              </p>
+            </div>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatutColor(abonnement.statut)}`}>
+              {getStatutIcon(abonnement.statut)}
+              <span className="ml-1">{abonnement.statut}</span>
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <User className="w-4 h-4 mr-2 text-gray-400" />
+              <span className={`text-sm ${getTextColorClass(false)}`}>
+                {abonnement.client?.prenom} {abonnement.client?.nom}
+              </span>
+            </div>
+            
+            <div className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+              <span className={`text-sm ${getTextColorClass(false)}`}>
+                Acheté le {formatDate(abonnement.dateAchat)}
+              </span>
+            </div>
+            
+            <div className="flex items-center">
+              <AlertTriangle className="w-4 h-4 mr-2 text-gray-400" />
+              <span className={`text-sm ${getTextColorClass(false)}`}>
+                Expire le {formatDate(abonnement.dateExpiration)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Progression */}
+        <div>
+          <h4 className={`text-sm font-medium ${getTextColorClass(true)} mb-3`}>
+            {translations?.usage || 'Utilisation'}
+          </h4>
+          
+          <div className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className={getTextColorClass(false)}>
+                {translations?.hoursUsed || 'Heures utilisées'}
+              </span>
+              <span className={getTextColorClass(true)}>
+                {abonnement.heuresUtilisees}h / {abonnement.nombreHeuresAchetees}h
+              </span>
+            </div>
+            
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div 
+                className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(progression, 100)}%` }}
+              />
+            </div>
+            
+            <div className="flex justify-between text-sm">
+              <span className={getTextColorClass(false)}>
+                {translations?.sessionsCount || 'Sessions'}
+              </span>
+              <span className={getTextColorClass(true)}>
+                {abonnement.nombreSessionsEffectuees}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Prix et actions */}
+        <div className="text-center lg:text-right">
+          <div className="mb-4">
+            <div className={`text-2xl font-bold ${getTextColorClass(true)}`}>
+              {formatPrice(abonnement.prixAchat)}
+            </div>
+            <div className={`text-sm ${getTextColorClass(false)}`}>
+              {formatPrice(abonnement.prixHoraireEquivalent)}/h
+            </div>
+          </div>
+
+          <div className="flex flex-col space-y-2">
+            {abonnement.statut === 'ACTIF' && onSuspendre && (
+              <button
+                onClick={onSuspendre}
+                className="flex items-center justify-center px-3 py-2 text-sm text-orange-600 border border-orange-600 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+              >
+                <Pause className="w-4 h-4 mr-1" />
+                {translations?.suspend || 'Suspendre'}
+              </button>
+            )}
+            
+            {abonnement.statut === 'SUSPENDU' && onReactiver && (
+              <button
+                onClick={onReactiver}
+                className="flex items-center justify-center px-3 py-2 text-sm text-green-600 border border-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+              >
+                <Play className="w-4 h-4 mr-1" />
+                {translations?.reactivate || 'Réactiver'}
+              </button>
+            )}
+            
+            <button className={`flex items-center justify-center px-3 py-2 text-sm border ${getBorderColorClass()} rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}>
+              <BarChart3 className="w-4 h-4 mr-1" />
+              {translations?.stats || 'Stats'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Abonnements;
+````
+
+## 6. Mise à jour des imports dans Dashboard
+
+````jsx
+// ...existing code...
+import Settings from '../../pages/Settings/Settings';
+
+// ✅ AJOUT: Nouvelles pages Gaming Center
+import Clients from '../../pages/Clients/Clients';
+import TypesAbonnements from '../../pages/TypesAbonnements/TypesAbonnements';
+import Abonnements from '../../pages/Abonnements/Abonnements';
+import Sessions from '../../pages/Sessions/Sessions';
+
+const Dashboard = () => {
+  // ...existing code...
+
+  return (
+    <div 
+      className="flex flex-col h-screen relative overflow-hidden transition-all duration-500"
+      style={{
+        background: dashboardBackground,
+        minHeight: '100vh'
+      }}
+    >
+      {/* ...existing decorative elements... */}
+
+      <Header 
+        toggleSidebar={toggleSidebar}
+        sidebarExpanded={sidebarExpanded}
+        isMobile={isMobile}
+      />
+
+      <div className="flex flex-1 overflow-hidden relative z-10">
+        <Sidebar
+          expanded={sidebarExpanded}
+          toggleSidebar={toggleSidebar}
+          isMobile={isMobile}
+        />
+
+        <main 
+          className="flex-1 overflow-auto p-7 transition-all duration-500"
+          style={{
+            backgroundColor: mainContentBg,
+            backdropFilter: mainContentBackdropFilter
+          }}
+        >
+          <div className="w-full h-full">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              
+              <Route path="/users" element={
+                hasPermission('USERS_VIEW') ? <Users /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/roles" element={
+                hasPermission('ROLES_VIEW') ? <Roles /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/permissions" element={
+                hasPermission('PERMISSIONS_VIEW') ? <Permissions /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/postes" element={
+                hasPermission('POSTES_VIEW') ? <Postes /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/postes/types" element={
+                hasPermission('POSTES_MANAGE') ? <TypesPostes /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/monitoring" element={
+                hasPermission('MONITORING_VIEW') ? <Monitoring /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              {/* ✅ AJOUT: Nouvelles routes Gaming Center */}
+              <Route path="/clients" element={
+                hasPermission('CLIENTS_VIEW') ? <Clients /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/types-abonnements" element={
+                hasPermission('ABONNEMENTS_MANAGE') ? <TypesAbonnements /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/abonnements" element={
+                hasPermission('ABONNEMENTS_VIEW') ? <Abonnements /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/sessions" element={
+                hasPermission('SESSIONS_VIEW') ? <Sessions /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/notifications" element={<Notifications />} />
+              
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
+````
+
+## 7. Mise à jour de la Sidebar
+
+````jsx
+// ...existing imports...
+import { 
+  Home, 
+  Users, 
+  Settings, 
+  LogOut, 
+  Pin, 
+  PanelLeftClose, 
+  PanelRightOpen, 
+  Clock,
+  // ✅ AJOUT: Nouvelles icônes Gaming Center
+  UserCheck,
+  CreditCard,
+  Package,
+  PlayCircle
+} from 'lucide-react';
+
+const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
+  // ...existing code...
+  
+  const menuItems = [
+    { 
+      icon: <Home size={20} />, 
+      label: translations.home || 'Accueil', 
+      path: '/dashboard',
+      permission: null 
+    },
+    
+    // ✅ Section Gaming Center
+    { 
+      icon: <UserCheck size={20} />, 
+      label: translations.clients || 'Clients', 
+      path: '/dashboard/clients',
+      permission: 'CLIENTS_VIEW'
+    },
+    { 
+      icon: <Package size={20} />, 
+      label: translations.subscriptionTypes || 'Types d\'abonnements', 
+      path: '/dashboard/types-abonnements',
+      permission: 'ABONNEMENTS_MANAGE'
+    },
+    { 
+      icon: <CreditCard size={20} />, 
+      label: translations.subscriptions || 'Abonnements', 
+      path: '/dashboard/abonnements',
+      permission: 'ABONNEMENTS_VIEW'
+    },
+    { 
+      icon: <PlayCircle size={20} />, 
+      label: translations.sessions || 'Sessions', 
+      path: '/dashboard/sessions',
+      permission: 'SESSIONS_VIEW'
+    },
+    
+    // Section Administration
+    { 
+      icon: <Users size={20} />, 
+      label: translations.users || 'Utilisateurs', 
+      path: '/dashboard/users',
+      permission: 'USERS_VIEW'
+    },
+    { 
+      icon: <Clock size={20} />, 
+      label: translations.monitoring || 'Monitoring', 
+      path: '/dashboard/monitoring',
+      permission: 'MONITORING_VIEW'
+    },
+    { 
+      icon: <Settings size={20} />, 
+      label: translations.settings || 'Paramètres', 
+      path: '/dashboard/settings',
+      permission: null
+    },
+  ];
+
+  // ...rest of component
+};
+
+export default Sidebar;
+````
+
+Cette implémentation vous donne maintenant :
+
+1. **Service complet des abonnements** avec toutes les fonctionnalités API
+2. **Hooks React Query** pour la gestion d'état et les mutations
+3. **Page Types d'Abonnements** avec interface complète
+4. **Page Abonnements** avec gestion des statuts et filtrage
+5. **Navigation mise à jour** avec les nouvelles routes
+6. **Gestion des permissions** intégrée
+7. **Interface responsive** adaptée aux thèmes
+
+Les prochaines étapes seraient :
+- Implémenter la page Sessions complète
+- Créer les formulaires de création/modification
+- Ajouter les composants de statistiques
+- Implémenter les fonctionnalités de recherche avancée
+
+Voulez-vous que je continue avec l'implémentation de la page Sessions ou des formulaires ?

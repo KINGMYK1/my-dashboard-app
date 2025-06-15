@@ -17,7 +17,9 @@ import {
   ClipboardList,
   ChevronDown,
   ChevronRight,
-  Gamepad2
+  Gamepad2,PlayCircle,
+  CreditCard, // ✅ NOUVEAU : Pour les abonnements
+  Star // ✅ NOUVEAU : Pour les types d'abonnements
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -37,6 +39,8 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
       console.log('🔑 Permissions:', user.role?.permissions);
       console.log('✅ Test POSTES_VIEW:', hasPermission('POSTES_VIEW'));
       console.log('✅ Test POSTES_MANAGE:', hasPermission('POSTES_MANAGE'));
+      console.log('✅ Test ABONNEMENTS_VIEW:', hasPermission('ABONNEMENTS_VIEW'));
+      console.log('✅ Test ABONNEMENTS_MANAGE:', hasPermission('ABONNEMENTS_MANAGE'));
     }
   }, [user, hasPermission]);
 
@@ -84,12 +88,40 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
           permission: 'POSTES_MANAGE'
         }
       ]
-    },
+    }, { 
+    icon: <PlayCircle size={20} />, 
+    label: translations.sessions || 'Sessions', 
+    path: '/dashboard/sessions',
+    permission: 'SESSIONS_VIEW' 
+  },
     { 
       icon: <UserPlus size={20} />, 
       label: translations.customers || 'Clients', 
       path: '/dashboard/clients',
       permission: 'CUSTOMERS_VIEW' 
+    },
+    // ✅ NOUVEAU : Menu Abonnements avec sous-menu
+    {
+      icon: <CreditCard size={20} />,
+      label: translations.subscriptions || 'Abonnements',
+      path: '/dashboard/abonnements',
+      permission: 'ABONNEMENTS_VIEW',
+      hasSubmenu: true,
+      submenuKey: 'abonnements',
+      children: [
+        {
+          icon: <Star size={18} />,
+          label: translations.subscriptionTypes || 'Types d\'Abonnements',
+          path: '/dashboard/types-abonnements',
+          permission: 'ABONNEMENTS_MANAGE'
+        },
+        {
+          icon: <CreditCard size={18} />,
+          label: translations.clientSubscriptions || 'Abonnements Clients',
+          path: '/dashboard/abonnements',
+          permission: 'ABONNEMENTS_VIEW'
+        }
+      ]
     },
     { 
       icon: <ShoppingCart size={20} />, 
@@ -111,6 +143,8 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     }
   ];
 
+  // Le reste du code reste identique...
+  
   // Filtrer les éléments du menu principal selon les permissions
   const filteredMenuItems = menuItems.filter(item => {
     if (!item.permission) return true;
@@ -378,7 +412,7 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
           )}
         </nav>
 
-          {/* Section inférieure - Déconnexion */}
+        {/* Section inférieure - Déconnexion */}
         
       </aside>
 

@@ -16,6 +16,13 @@ import Settings from '../../pages/Settings/Settings';
 import Monitoring from '../../pages/Monitoring/Monitoring';
 import Notifications from '../../pages/Notifications/Notifications';
 
+
+import Clients from '../../pages/Clients/Clients';
+import TypesAbonnements from '../../pages/TypesAbonnements/TypesAbonnements';
+import Abonnements from '../../pages/Abonnements/Abonnements';
+// import Sessions from '../../pages/Sessions/Sessions';
+import Sessions from '../../pages/Sessions/Sessions'; // ✅ AJOUT
+
 const Dashboard = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
@@ -172,6 +179,27 @@ const Dashboard = () => {
               
               <Route path="/monitoring" element={
                 hasPermission('MONITORING_VIEW') ? <Monitoring /> : <Navigate to="/dashboard" replace />
+              } />
+
+                <Route path="/types-abonnements" element={
+                  hasPermission('ABONNEMENTS_MANAGE') ? <TypesAbonnements /> : <Navigate to="/dashboard" replace />
+                } />
+                 <Route path="/sessions" element={
+                hasPermission('SESSIONS_VIEW') ? <Sessions /> : <Navigate to="/dashboard" replace />
+              } />
+                {/* ✅ AJOUT: Nouvelles routes Gaming Center */}
+               <Route path="/clients" element={
+                hasPermission('CLIENTS_VIEW') ? <Clients /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              {/*
+              */}
+              {/* <Route path="/sessions" element={
+                hasPermission('SESSIONS_VIEW') ? <Sessions /> : <Navigate to="/dashboard" replace />
+              } /> */}
+              
+              <Route path="/abonnements" element={
+                hasPermission('ABONNEMENTS_VIEW') ? <Abonnements /> : <Navigate to="/dashboard" replace />
               } />
               
               <Route path="/settings" element={<Settings />} />

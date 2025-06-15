@@ -2,7 +2,7 @@ import { api } from '../api/apiService';
 
 const typePosteService = {
   // Récupérer tous les types de postes
-  getAllTypesPostes: async (includeInactive = false) => {
+  getAllTypesPostes: async (includeInactive = true) => {
     try {
       console.log('📋 [TYPE_POSTE_SERVICE] Récupération types postes, includeInactive:', includeInactive);
       

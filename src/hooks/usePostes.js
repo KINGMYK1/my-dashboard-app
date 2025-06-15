@@ -350,3 +350,46 @@ export function usePosteStatistics(id) {
     }
   });
 }
+
+// ✅ AJOUT: Hook spécialisé pour récupérer les postes disponibles pour une session
+export function usePostesDisponibles() {
+  const { showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useQuery({
+    queryKey: ['postes', 'disponibles'],
+    queryFn: async () => {
+      console.log('🔄 [USE_POSTES_DISPONIBLES] Récupération postes disponibles');
+      
+      const response = await posteService.getAllPostes(false); // Seulement les actifs
+      
+      // Extraire les données selon la structure de réponse
+      let postes = [];
+      
+      if (response?.data?.data && Array.isArray(response.data.data)) {
+        postes = response.data.data;
+      } else if (response?.data && Array.isArray(response.data)) {
+        postes = response.data;
+      } else if (Array.isArray(response)) {
+        postes = response;
+      }
+      
+      // Filtrer les postes disponibles uniquement
+      const postesDisponibles = postes.filter(poste => 
+        poste.estActif && 
+        (poste.etat === 'Disponible' || poste.etat === 'disponible') &&
+        poste.typePoste // S'assurer qu'il a un type
+      );
+      
+      console.log('✅ [USE_POSTES_DISPONIBLES] Postes disponibles:', postesDisponibles.length);
+      
+      return postesDisponibles;
+    },
+    staleTime: 30000, // 30 secondes - plus court pour les sessions
+    refetchInterval: 60000, // Actualiser toutes les minutes
+    onError: (error) => {
+      console.error('❌ [USE_POSTES_DISPONIBLES] Erreur:', error);
+      showError(translations?.errorLoadingPostes || 'Erreur lors du chargement des postes');
+    }
+  });
+}

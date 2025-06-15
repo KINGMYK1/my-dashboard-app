@@ -164,10 +164,10 @@ class TarifService {
     const formatters = {
       'EUR': new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }),
       'USD': new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }),
-      'MAD': new Intl.NumberFormat('ar-MA', { style: 'currency', currency: 'MAD' })
+      'MAD': new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'MAD' })
     };
 
-    const formatter = formatters[devise] || formatters['EUR'];
+    const formatter = formatters[devise] || formatters['MAD'];
     return formatter.format(prix || 0);
   }
 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Trash2, Palette, Tag, DollarSign, Clock } from 'lucide-react';
+import { X, Save, Plus, Trash2, Palette, Tag, DollarSign, Clock, Sparkles } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useCreateTypePoste, useUpdateTypePoste } from '../../hooks/useTypePostes';
 import Portal from '../../components/Portal/Portal';
+import GamingIcon, { GamingIconSelector } from '../../components/GamingIcon/GamingIcon';
+import GamingIconService from '../../services/gamingIconService';
 
 const TypePosteForm = ({ typePoste, onClose }) => {
   const { translations } = useLanguage();
@@ -28,38 +30,46 @@ const TypePosteForm = ({ typePoste, onClose }) => {
   const [plansTarifaires, setPlansTarifaires] = useState([]);
   const [validationErrors, setValidationErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showIconSelector, setShowIconSelector] = useState(false);
 
   const isDarkMode = effectiveTheme === 'dark';
 
-  // Styles dynamiques basés sur le thème
-  const getTextColorClass = (isPrimary) => 
-    isDarkMode 
-      ? (isPrimary ? 'text-white' : 'text-gray-300') 
-      : (isPrimary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]');
-  
-  const getBgColorClass = () => 
-    isDarkMode ? 'bg-gray-800' : 'bg-[var(--background-modal-card)]';
-  
-  const getBorderColorClass = () => 
-    isDarkMode ? 'border-gray-700' : 'border-[var(--border-color)]';
-  
-  const getInputBgClass = () => 
-    isDarkMode ? 'bg-gray-700' : 'bg-[var(--background-input)]';
-  
-  const getInputTextColorClass = () => 
-    isDarkMode ? 'text-white' : 'text-[var(--text-primary)]';
-  
-  const getButtonBgClass = () => 
-    isDarkMode ? 'bg-purple-600' : 'bg-[var(--accent-color-primary)]';
-  
-  const getButtonHoverBgClass = () => 
-    isDarkMode ? 'hover:bg-purple-700' : 'hover:opacity-80';
-  
-  const getCancelButtonBgClass = () => 
-    isDarkMode ? 'bg-gray-700/50' : 'bg-[var(--background-input)]';
-  
-  const getCancelButtonHoverBgClass = () => 
-    isDarkMode ? 'hover:bg-gray-600/50' : 'hover:opacity-80';
+  // ✅ Suggestions d'icônes basées sur le nom
+  const suggestedIcons = GamingIconService.getSuggestedIcons(formData.nom);
+
+  // ✅ Styles compacts et modérés
+  const styles = {
+    container: `fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50 p-4`,
+    modal: `relative bg-gradient-to-br ${isDarkMode 
+      ? 'from-gray-900 via-gray-800 to-purple-900/10' 
+      : 'from-white via-gray-50 to-purple-50/50'
+    } rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border ${isDarkMode 
+      ? 'border-purple-500/20' 
+      : 'border-purple-200'
+    }`,
+    header: `flex justify-between items-center p-4 rounded-t-xl bg-gradient-to-r ${isDarkMode
+      ? 'from-purple-600/10 to-blue-600/10 border-b border-purple-500/20'
+      : 'from-purple-50 to-blue-50 border-b border-purple-200'
+    }`,
+    input: `w-full p-3 rounded-lg transition-all ${isDarkMode 
+      ? 'bg-gray-800/50 border-gray-600 text-white focus:border-purple-400' 
+      : 'bg-white border-gray-300 text-gray-900 focus:border-purple-400'
+    } border focus:ring-2 focus:ring-purple-400/20 outline-none text-sm`,
+    button: `px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 ${isDarkMode 
+      ? 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white' 
+      : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white'
+    } text-sm`,
+    cancelButton: `px-4 py-2 rounded-lg font-medium transition-all ${isDarkMode 
+      ? 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-300' 
+      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+    } text-sm`,
+    card: `p-4 rounded-lg ${isDarkMode 
+      ? 'bg-gray-800/20 border-gray-700/30' 
+      : 'bg-white/60 border-gray-200'
+    } border`,
+    textPrimary: isDarkMode ? 'text-white' : 'text-gray-900',
+    textSecondary: isDarkMode ? 'text-gray-300' : 'text-gray-600',
+  };
 
   useEffect(() => {
     if (isEdit && typePoste) {
@@ -93,7 +103,6 @@ const TypePosteForm = ({ typePoste, onClose }) => {
       [name]: type === 'checkbox' ? checked : value
     }));
     
-    // Effacer les erreurs de validation lors de la saisie
     if (validationErrors[name]) {
       setValidationErrors(prev => ({
         ...prev,
@@ -146,7 +155,6 @@ const TypePosteForm = ({ typePoste, onClose }) => {
       errors.couleur = translations.colorInvalid || 'Le code couleur doit être au format hexadécimal (#000000)';
     }
     
-    // Validation des plans tarifaires
     plansTarifaires.forEach((plan, index) => {
       if (plan.dureeMinutes && (isNaN(plan.dureeMinutes) || parseInt(plan.dureeMinutes) <= 0)) {
         errors[`plan_${index}_duree`] = translations.planDurationInvalid || 'La durée doit être supérieure à 0';
@@ -163,19 +171,11 @@ const TypePosteForm = ({ typePoste, onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    console.log('📝 [TYPE_POSTE_FORM] Début soumission');
-    console.log('📝 [TYPE_POSTE_FORM] FormData avant validation:', formData);
-    console.log('📝 [TYPE_POSTE_FORM] Plans tarifaires:', plansTarifaires);
-    
-    if (!validateForm()) {
-      console.log('❌ [TYPE_POSTE_FORM] Validation échouée');
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
     
     try {
-      // ✅ CORRECTION: Nettoyer et structurer les données correctement
       const cleanFormData = {
         nom: formData.nom?.trim(),
         description: formData.description?.trim() || null,
@@ -189,7 +189,6 @@ const TypePosteForm = ({ typePoste, onClose }) => {
         estActif: Boolean(formData.estActif)
       };
 
-      // ✅ Nettoyer les plans tarifaires
       const cleanPlans = plansTarifaires.map((plan, index) => ({
         nom: plan.nom?.trim() || `Plan ${plan.dureeMinutes || index + 1} min`,
         dureeMinutes: parseInt(plan.dureeMinutes) || 60,
@@ -199,16 +198,10 @@ const TypePosteForm = ({ typePoste, onClose }) => {
         ordre: index
       })).filter(plan => plan.dureeMinutes > 0 && plan.prix >= 0);
 
-      console.log('📝 [TYPE_POSTE_FORM] Données nettoyées:', cleanFormData);
-      console.log('📝 [TYPE_POSTE_FORM] Plans nettoyés:', cleanPlans);
-
-      // ✅ Structure selon ce que le hook attend
       const dataToSubmit = {
         typePosteData: cleanFormData,
         plansTarifaires: cleanPlans
       };
-
-      console.log('📝 [TYPE_POSTE_FORM] Payload final:', dataToSubmit);
 
       if (isEdit) {
         await updateTypePosteMutation.mutateAsync({
@@ -220,7 +213,6 @@ const TypePosteForm = ({ typePoste, onClose }) => {
         await createTypePosteMutation.mutateAsync(dataToSubmit);
       }
       
-      console.log('✅ [TYPE_POSTE_FORM] Soumission réussie');
       onClose();
     } catch (error) {
       console.error('❌ [TYPE_POSTE_FORM] Erreur lors de la soumission:', error);
@@ -231,278 +223,301 @@ const TypePosteForm = ({ typePoste, onClose }) => {
 
   return (
     <Portal>
-      <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4">
-        <div className={`relative ${getBgColorClass()} rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto ${getBorderColorClass()} border`}>
+      <div className={styles.container}>
+        <div className={styles.modal}>
           
-          {/* Header */}
-          <div className={`flex justify-between items-center p-5 rounded-t-lg ${getBorderColorClass()} border-b`}>
-            <h2 className={`text-xl font-semibold ${getTextColorClass(true)}`}>
-              {title}
-            </h2>
+          {/* ✅ Header compact */}
+          <div className={styles.header}>
+            <div className="flex items-center space-x-3">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h2 className={`text-lg font-bold ${styles.textPrimary}`}>
+                  {title}
+                </h2>
+                <p className={`text-xs ${styles.textSecondary}`}>
+                  🎮 Configuration gaming
+                </p>
+              </div>
+            </div>
             <button
               onClick={onClose}
-              className={`p-2 rounded-full ${getCancelButtonBgClass()} ${getCancelButtonHoverBgClass()} ${getTextColorClass(false)} transition-colors`}
+              className={`p-2 rounded-lg ${styles.cancelButton} hover:scale-105 transition-transform`}
               disabled={isSubmitting}
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Form compact */}
+          <form onSubmit={handleSubmit} className="p-4 space-y-6">
             
-            {/* Informations de base */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label htmlFor="nom" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
-                  {translations.typePosteName || "Nom du type de poste"} <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
+            {/* ✅ Section Informations de base - Compact */}
+            <div className={styles.card}>
+              <div className="flex items-center space-x-2 mb-4">
+                <Tag size={16} className="text-purple-400" />
+                <h3 className={`text-base font-semibold ${styles.textPrimary}`}>
+                  Informations de base
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="lg:col-span-2">
+                  <label htmlFor="nom" className={`block text-sm font-medium mb-2 ${styles.textSecondary}`}>
+                    Nom du type <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     id="nom"
                     name="nom"
                     value={formData.nom}
                     onChange={handleChange}
-                    placeholder={translations.typePosteNamePlaceholder || "Nom du type (ex: Gaming Standard, VIP)"}
-                    className={`w-full p-3 pl-10 rounded-md ${getInputBgClass()} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors`}
+                    placeholder="ex: PlayStation 5, Xbox Zone..."
+                    className={styles.input}
                     disabled={isSubmitting}
                   />
-                  <Tag size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${getTextColorClass(false)}`} />
+                  {validationErrors.nom && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.nom}</p>
+                  )}
                 </div>
-                {validationErrors.nom && (
-                  <p className="text-red-500 text-xs mt-1">{validationErrors.nom}</p>
-                )}
+
+                <div>
+                  <label htmlFor="tarifHoraireBase" className={`block text-sm font-medium mb-2 ${styles.textSecondary}`}>
+                    Tarif/heure <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      id="tarifHoraireBase"
+                      name="tarifHoraireBase"
+                      value={formData.tarifHoraireBase}
+                      onChange={handleChange}
+                      placeholder="25.00"
+                      className={`${styles.input} pl-12`}
+                      disabled={isSubmitting}
+                    />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-sm font-medium">
+                      DH
+                    </div>
+                  </div>
+                  {validationErrors.tarifHoraireBase && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.tarifHoraireBase}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${styles.textSecondary}`}>
+                    Couleur thématique
+                  </label>
+                  <div className="flex space-x-2">
+                    <input
+                      type="color"
+                      name="couleur"
+                      value={formData.couleur}
+                      onChange={handleChange}
+                      className="w-12 h-10 rounded border cursor-pointer"
+                      disabled={isSubmitting}
+                    />
+                    <input
+                      type="text"
+                      name="couleur"
+                      value={formData.couleur}
+                      onChange={handleChange}
+                      placeholder="#8b5cf6"
+                      className={`${styles.input} flex-1`}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="tarifHoraireBase" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
-                  {translations.hourlyRate || "Tarif horaire de base"} <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    id="tarifHoraireBase"
-                    name="tarifHoraireBase"
-                    value={formData.tarifHoraireBase}
-                    onChange={handleChange}
-                    placeholder={translations.hourlyRatePlaceholder || "Tarif en DH/heure"}
-                    className={`w-full p-3 pl-10 rounded-md ${getInputBgClass()} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors`}
-                    disabled={isSubmitting}
-                  />
-                  <DollarSign size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${getTextColorClass(false)}`} />
-                </div>
-                {validationErrors.tarifHoraireBase && (
-                  <p className="text-red-500 text-xs mt-1">{validationErrors.tarifHoraireBase}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="couleur" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
-                  {translations.color || "Couleur"}
-                </label>
-                <div className="relative">
-                  <input
-                    type="color"
-                    id="couleur"
-                    name="couleur"
-                    value={formData.couleur}
-                    onChange={handleChange}
-                    className={`w-full h-12 p-1 rounded-md ${getInputBgClass()} ${getBorderColorClass()} border focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors`}
-                    disabled={isSubmitting}
-                  />
-                </div>
-                {validationErrors.couleur && (
-                  <p className="text-red-500 text-xs mt-1">{validationErrors.couleur}</p>
-                )}
-              </div>
-            </div>
-
-            {/* Description et icône */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="description" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
-                  {translations.description || "Description"}
+              <div className="mt-4">
+                <label htmlFor="description" className={`block text-sm font-medium mb-2 ${styles.textSecondary}`}>
+                  Description
                 </label>
                 <textarea
                   id="description"
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  placeholder={translations.descriptionPlaceholder || "Description du type de poste..."}
-                  rows={3}
-                  className={`w-full p-3 rounded-md ${getInputBgClass()} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors resize-vertical`}
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="icone" className={`block text-sm font-medium mb-2 ${getTextColorClass(false)}`}>
-                  {translations.icon || "Icône"}
-                </label>
-                <input
-                  type="text"
-                  id="icone"
-                  name="icone"
-                  value={formData.icone}
-                  onChange={handleChange}
-                  placeholder={translations.iconPlaceholder || "URL de l'icône ou emoji"}
-                  className={`w-full p-3 rounded-md ${getInputBgClass()} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors`}
+                  placeholder="Décrivez ce type de poste..."
+                  rows={2}
+                  className={`${styles.input} resize-none`}
                   disabled={isSubmitting}
                 />
               </div>
             </div>
 
-            {/* État actif */}
-            <div className="flex items-center">
+            {/* ✅ Section Icône - Compact */}
+            <div className={styles.card}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <Palette size={16} className="text-blue-400" />
+                  <h3 className={`text-base font-semibold ${styles.textPrimary}`}>
+                    Icône Gaming
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowIconSelector(!showIconSelector)}
+                  className={`px-3 py-1 text-xs rounded ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} transition-colors`}
+                >
+                  {showIconSelector ? 'Masquer' : 'Choisir'}
+                </button>
+              </div>
+
+              {/* Aperçu compact */}
+              <div className="flex items-center space-x-3 mb-3 p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10">
+                <div className="p-2 rounded-lg bg-white/10">
+                  {formData.icone ? (
+                    <GamingIcon iconKey={formData.icone} size={32} />
+                  ) : (
+                    <div className={`w-8 h-8 rounded bg-gray-300 dark:bg-gray-600 flex items-center justify-center ${styles.textSecondary} text-xs`}>
+                      ?
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className={`text-sm font-medium ${styles.textPrimary}`}>
+                    {formData.icone || 'Aucune icône'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Sélecteur compact */}
+              {showIconSelector && (
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white/5">
+                  <GamingIconSelector
+                    selectedIcon={formData.icone}
+                    onSelect={(iconKey) => {
+                      setFormData(prev => ({ ...prev, icone: iconKey }));
+                      setShowIconSelector(false);
+                    }}
+                    suggestedIcons={suggestedIcons}
+                    compact={true}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ✅ Section Plans - Compact */}
+            <div className={styles.card}>
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center space-x-2">
+                  <DollarSign size={16} className="text-green-400" />
+                  <h3 className={`text-base font-semibold ${styles.textPrimary}`}>
+                    Plans ({plansTarifaires.length})
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={addPlan}
+                  className={`flex items-center space-x-1 px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-all text-xs`}
+                  disabled={isSubmitting}
+                >
+                  <Plus size={14} />
+                  <span>Ajouter</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {plansTarifaires.map((plan, index) => (
+                  <div key={index} className="grid grid-cols-4 gap-3 p-3 rounded-lg bg-gray-100/50 dark:bg-gray-800/50">
+                    <input
+                      type="text"
+                      value={plan.nom || ''}
+                      onChange={(e) => handlePlanChange(index, 'nom', e.target.value)}
+                      placeholder="Nom du plan"
+                      className={`${styles.input} text-xs`}
+                      disabled={isSubmitting}
+                    />
+                    
+                    <input
+                      type="number"
+                      min="1"
+                      value={plan.dureeMinutes || ''}
+                      onChange={(e) => handlePlanChange(index, 'dureeMinutes', e.target.value)}
+                      placeholder="Min"
+                      className={`${styles.input} text-xs`}
+                      disabled={isSubmitting}
+                    />
+                    
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={plan.prix || ''}
+                      onChange={(e) => handlePlanChange(index, 'prix', e.target.value)}
+                      placeholder="Prix DH"
+                      className={`${styles.input} text-xs`}
+                      disabled={isSubmitting}
+                    />
+                    
+                    <button
+                      type="button"
+                      onClick={() => removePlan(index)}
+                      className="p-2 bg-red-500 hover:bg-red-600 text-white rounded transition-all"
+                      disabled={isSubmitting}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                
+                {plansTarifaires.length === 0 && (
+                  <div className="text-center py-6 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                    <Clock className={`mx-auto mb-2 ${styles.textSecondary}`} size={24} />
+                    <p className={`${styles.textSecondary} text-sm`}>
+                      Aucun plan - Tarif horaire utilisé
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* État actif compact */}
+            <div className="flex items-center space-x-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
               <input
                 type="checkbox"
                 id="estActif"
                 name="estActif"
                 checked={formData.estActif}
                 onChange={handleChange}
-                className={`mr-3 h-4 w-4 rounded border ${isDarkMode ? 'border-gray-600' : 'border-[var(--border-color)]'} ${isDarkMode ? 'bg-gray-700' : 'bg-[var(--background-input)]'} focus:ring-2 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} transition-colors`}
+                className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
                 disabled={isSubmitting}
               />
-              <label htmlFor="estActif" className={`text-sm font-medium ${getTextColorClass(false)}`}>
-                {translations.isActive || "Type de poste actif"}
+              <label htmlFor="estActif" className={`text-sm font-medium ${styles.textPrimary}`}>
+                Type de poste actif
               </label>
             </div>
 
-            {/* Plans tarifaires */}
-            <div className={`border-t ${getBorderColorClass()} pt-6`}>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className={`text-lg font-semibold ${getTextColorClass(true)}`}>
-                  {translations.pricingPlans || "Plans tarifaires"}
-                </h3>
-                <button
-                  type="button"
-                  onClick={addPlan}
-                  className={`flex items-center space-x-2 px-3 py-2 ${getButtonBgClass()} ${getButtonHoverBgClass()} text-white rounded-lg transition-colors`}
-                  disabled={isSubmitting}
-                >
-                  <Plus size={16} />
-                  <span>{translations.addPricingPlan || "Ajouter un plan"}</span>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {plansTarifaires.map((plan, index) => (
-                  <div key={index} className={`p-4 ${getInputBgClass()} rounded-lg ${getBorderColorClass()} border`}>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 ${getTextColorClass(false)}`}>
-                          {translations.planName || "Nom du plan"}
-                        </label>
-                        <input
-                          type="text"
-                          value={plan.nom || ''}
-                          onChange={(e) => handlePlanChange(index, 'nom', e.target.value)}
-                          placeholder={translations.planNamePlaceholder || "ex: 1 heure, 30 minutes"}
-                          className={`w-full p-2 text-sm rounded ${isDarkMode ? 'bg-gray-600' : 'bg-white'} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-1 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors`}
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 ${getTextColorClass(false)}`}>
-                          {translations.planDuration || "Durée (minutes)"}
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min="1"
-                            value={plan.dureeMinutes || ''}
-                            onChange={(e) => handlePlanChange(index, 'dureeMinutes', e.target.value)}
-                            className={`w-full p-2 text-sm rounded ${isDarkMode ? 'bg-gray-600' : 'bg-white'} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-1 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors`}
-                            disabled={isSubmitting}
-                          />
-                          <Clock size={14} className={`absolute right-2 top-1/2 -translate-y-1/2 ${getTextColorClass(false)}`} />
-                        </div>
-                        {validationErrors[`plan_${index}_duree`] && (
-                          <p className="text-red-500 text-xs mt-1">{validationErrors[`plan_${index}_duree`]}</p>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 ${getTextColorClass(false)}`}>
-                          {translations.planPrice || "Prix (DH)"}
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={plan.prix || ''}
-                            onChange={(e) => handlePlanChange(index, 'prix', e.target.value)}
-                            className={`w-full p-2 text-sm rounded ${isDarkMode ? 'bg-gray-600' : 'bg-white'} ${getInputTextColorClass()} ${getBorderColorClass()} border focus:ring-1 ${isDarkMode ? 'focus:ring-purple-500' : 'focus:ring-[var(--accent-color-primary)]'} outline-none transition-colors`}
-                            disabled={isSubmitting}
-                          />
-                          <DollarSign size={14} className={`absolute right-2 top-1/2 -translate-y-1/2 ${getTextColorClass(false)}`} />
-                        </div>
-                        {validationErrors[`plan_${index}_prix`] && (
-                          <p className="text-red-500 text-xs mt-1">{validationErrors[`plan_${index}_prix`]}</p>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-end">
-                        <button
-                          type="button"
-                          onClick={() => removePlan(index)}
-                          className="w-full p-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors text-sm"
-                          disabled={isSubmitting}
-                        >
-                          <Trash2 size={14} className="mx-auto" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {plansTarifaires.length === 0 && (
-                  <p className={`text-center ${getTextColorClass(false)} text-sm py-4`}>
-                    {translations.noPricingPlans || "Aucun plan tarifaire. Les prix seront calculés selon le tarif horaire de base."}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Boutons d'action */}
-            <div className={`flex justify-end space-x-3 pt-6 border-t ${getBorderColorClass()}`}>
+            {/* ✅ Boutons compacts */}
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-300 dark:border-gray-600">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className={`px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getCancelButtonBgClass()} ${getCancelButtonHoverBgClass()} ${getTextColorClass(false)}`}
+                className={`${styles.cancelButton} disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {translations.cancel || 'Annuler'}
+                Annuler
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`flex items-center space-x-2 px-6 py-2 ${getButtonBgClass()} ${getButtonHoverBgClass()} text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`${styles.button} disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2`}
               >
                 {isSubmitting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>
-                      {isEdit 
-                        ? (translations.processingUpdate || 'Modification...') 
-                        : (translations.processingCreate || 'Création...')
-                      }
-                    </span>
+                    <span>{isEdit ? 'Modification...' : 'Création...'}</span>
                   </>
                 ) : (
                   <>
                     <Save size={16} />
-                    <span>
-                      {isEdit 
-                        ? (translations.update || 'Modifier') 
-                        : (translations.create || 'Créer')
-                      }
-                    </span>
+                    <span>{isEdit ? 'Modifier' : 'Créer'}</span>
                   </>
                 )}
               </button>

@@ -27,11 +27,202 @@ const availableLanguages = [
 
 // Traductions par défaut
 const defaultTranslations = {
+
+// Dans votre fichier src/contexts/LanguageContext.jsx ou src/locales/fr.js
+ 
+  // ========== ABONNEMENTS ==========
+  subscriptions: "Abonnements",
+  subscriptionTypes: "Types d'Abonnements", 
+  clientSubscriptions: "Abonnements Clients",
+  subscriptionManagement: "Gestion des Abonnements",
+  addSubscription: "Nouvel Abonnement",
+  editSubscription: "Modifier l'Abonnement",
+  deleteSubscription: "Supprimer l'Abonnement",
+  subscriptionDetails: "Détails de l'Abonnement",
+  activeSubscriptions: "Abonnements Actifs",
+  expiredSubscriptions: "Abonnements Expirés",
+  subscriptionHistory: "Historique des Abonnements",
+  renewSubscription: "Renouveler l'Abonnement",
+  cancelSubscription: "Annuler l'Abonnement",
+  subscriptionStatus: "Statut de l'Abonnement",
+  subscriptionDuration: "Durée de l'Abonnement",
+  subscriptionPrice: "Prix de l'Abonnement",
+  subscriptionStartDate: "Date de Début",
+  subscriptionEndDate: "Date de Fin",
+  remainingTime: "Temps Restant",
+  autoRenewal: "Renouvellement Automatique",
+  
+  // ========== TYPES D'ABONNEMENTS ==========
+  addSubscriptionType: "Nouveau Type d'Abonnement",
+  editSubscriptionType: "Modifier le Type d'Abonnement",
+  deleteSubscriptionType: "Supprimer le Type d'Abonnement",
+  subscriptionTypeName: "Nom du Type",
+  subscriptionTypeDescription: "Description du Type",
+  subscriptionTypePrice: "Prix du Type",
+  subscriptionTypeDuration: "Durée du Type",
+  subscriptionTypeFeatures: "Fonctionnalités Incluses",
+  noSubscriptionTypes: "Aucun type d'abonnement trouvé",
+  noSubscriptionsFound: "Aucun abonnement trouvé",
+  createFirstSubscriptionType: "Créer le premier type d'abonnement",
+  
+  // ========== CLIENTS (Complémentaires) ==========
+  clientDetails: "Détails du Client",
+  clientHistory: "Historique du Client", 
+ 
+  clientSessions: "Sessions du Client",
+  clientStats: "Statistiques du Client",
+  addNote: "Ajouter une Note",
+  noteText: "Texte de la note",
+  clientNotes: "Notes du Client",
+  mergeClients: "Fusionner les Clients",
+  selectPrimaryClient: "Sélectionner le client principal",
+  mergeClientsDescription: "Fusionner deux comptes clients en un seul",
+  exportSelected: "Exporter la sélection",
+  bulkActions: "Actions en lot",
+  
+  // ========== SESSIONS (Si utilisé) ==========
+  sessions: "Sessions",
+  activeSessions: "Sessions Actives", 
+  sessionHistory: "Historique des Sessions",
+  startSession: "Démarrer une Session",
+  endSession: "Terminer la Session",
+  pauseSession: "Mettre en Pause",
+  resumeSession: "Reprendre la Session",
+  sessionDuration: "Durée de la Session",
+  sessionCost: "Coût de la Session",
+  anonymousSession: "Session Anonyme",
+  
+  // ========== VENTES ==========
+  pointOfSale: "Point de Vente",
+  sales: "Ventes",
+  newSale: "Nouvelle Vente",
+  saleHistory: "Historique des Ventes",
+  dailySales: "Ventes du Jour",
+  monthlySales: "Ventes du Mois",
+  totalRevenue: "Chiffre d'Affaires Total",
+  
+  // ========== INVENTAIRE ==========
+  inventory: "Inventaire",
+  stock: "Stock",
+  products: "Produits",
+  addProduct: "Ajouter un Produit",
+  productName: "Nom du Produit",
+  productPrice: "Prix du Produit",
+  productStock: "Stock du Produit",
+  lowStock: "Stock Faible",
+  outOfStock: "Rupture de Stock",
+  
+  // ========== ÉVÉNEMENTS ==========
+  events: "Événements",
+  addEvent: "Nouvel Événement",
+  editEvent: "Modifier l'Événement",
+  deleteEvent: "Supprimer l'Événement",
+  eventName: "Nom de l'Événement",
+  eventDescription: "Description de l'Événement",
+  eventDate: "Date de l'Événement",
+  eventTime: "Heure de l'Événement",
+  upcomingEvents: "Événements à Venir",
+  pastEvents: "Événements Passés",
+  
+  // ========== DÉPENSES ==========
+  expenses: "Dépenses",
+  addExpense: "Nouvelle Dépense",
+  editExpense: "Modifier la Dépense",
+  deleteExpense: "Supprimer la Dépense",
+  expenseAmount: "Montant de la Dépense",
+  expenseCategory: "Catégorie de Dépense",
+  expenseDescription: "Description de la Dépense",
+  expenseDate: "Date de la Dépense",
+  monthlyExpenses: "Dépenses Mensuelles",
+  yearlyExpenses: "Dépenses Annuelles",
+  
+  // ========== RAPPORTS ==========
+  reports: "Rapports",
+  generateReport: "Générer un Rapport",
+  dailyReport: "Rapport Journalier",
+  weeklyReport: "Rapport Hebdomadaire",
+  monthlyReport: "Rapport Mensuel",
+  yearlyReport: "Rapport Annuel",
+  financialReport: "Rapport Financier",
+  activityReport: "Rapport d'Activité",
+  
+  // ========== SUPERVISION ==========
+  supervision: "Supervision",
+  monitoring: "Monitoring",
+  systemStatus: "État du Système",
+  userActivity: "Activité des Utilisateurs",
+  systemLogs: "Journaux Système",
+  
+  // ========== MESSAGES D'ERREUR ET SUCCÈS ==========
+  subscriptionCreatedSuccess: "Abonnement créé avec succès",
+  subscriptionUpdatedSuccess: "Abonnement modifié avec succès", 
+  subscriptionDeletedSuccess: "Abonnement supprimé avec succès",
+  subscriptionTypeCreatedSuccess: "Type d'abonnement créé avec succès",
+  subscriptionTypeUpdatedSuccess: "Type d'abonnement modifié avec succès",
+  subscriptionTypeDeletedSuccess: "Type d'abonnement supprimé avec succès",
+  errorCreatingSubscription: "Erreur lors de la création de l'abonnement",
+  errorUpdatingSubscription: "Erreur lors de la modification de l'abonnement",
+  errorDeletingSubscription: "Erreur lors de la suppression de l'abonnement",
+  errorLoadingSubscriptions: "Erreur lors du chargement des abonnements",
+  errorCreatingSubscriptionType: "Erreur lors de la création du type d'abonnement",
+  errorLoadingSubscriptionTypes: "Erreur lors du chargement des types d'abonnements",
+  
+  // ========== FORMULAIRES ==========
+  subscriptionForm: "Formulaire d'Abonnement",
+  subscriptionTypeForm: "Formulaire de Type d'Abonnement",
+  selectSubscriptionType: "Sélectionner un type d'abonnement",
+  selectClient: "Sélectionner un client",
+  subscriptionNameRequired: "Le nom de l'abonnement est requis",
+  subscriptionPriceRequired: "Le prix de l'abonnement est requis",
+  subscriptionDurationRequired: "La durée de l'abonnement est requise",
+  
+  // ========== NAVIGATION ET FILTRES ==========
+  filterByStatus: "Filtrer par statut",
+  filterByType: "Filtrer par type",
+  filterByClient: "Filtrer par client", 
+  filterByDate: "Filtrer par date",
+  searchSubscriptions: "Rechercher des abonnements",
+  searchSubscriptionTypes: "Rechercher des types d'abonnements",
+  sortByName: "Trier par nom",
+  sortByDate: "Trier par date",
+  sortByPrice: "Trier par prix",
+  sortByStatus: "Trier par statut",
+  
+  // ========== STATISTIQUES ==========
+  totalSubscriptions: "Total des Abonnements",
+  activeSubscriptionsCount: "Abonnements Actifs",
+  expiredSubscriptionsCount: "Abonnements Expirés",
+  monthlyRevenue: "Revenus Mensuels",
+  averageSubscriptionValue: "Valeur Moyenne des Abonnements",
+  
+  // ========== ACTIONS ==========
+  viewSubscription: "Voir l'Abonnement",
+ 
+  extendSubscription: "Prolonger l'Abonnement",
+  
+  // ========== CATÉGORIES DE PERMISSIONS (Mise à jour) ==========
+ 
+    system: "Système",
+    users: "Utilisateurs", 
+    roles: "Rôles",
+    permissions: "Permissions",
+    postes: "Postes Gaming",
+    customers: "Clients",
+   
+   
+    finance: "Finances",
+  
+    typesPostes: "Types de Postes",
+  
+    other: "Autres",
+  
+
+
   // Navigation
   dashboard: "Tableau de bord",
-  users: "Utilisateurs",
-  roles: "Rôles",
-  permissions: "Permissions",
+ 
+  
+ 
   settings: "Paramètres",
   
   // Actions générales
@@ -124,7 +315,7 @@ const defaultTranslations = {
   examplesOfPermissions: "Exemples de permissions",
   modification: "Modification...",
   creation: "Création...",
-  system: "Système",
+  
 
   // Catégories de permissions (pour Roles et Permissions)
   permissionCategories: {
