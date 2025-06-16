@@ -243,7 +243,55 @@ export function useStartSession() {
     },
   });
 }
+/**
+ * ✅ NOUVEAU: Hook pour l'historique des sessions
+ */
+export function useSessionsHistory(filters = {}) {
+  const { showError } = useNotification();
+  
+  return useQuery({
+    queryKey: ['sessions', 'history', filters],
+    queryFn: async () => {
+      try {
+        const response = await sessionService.getSessionsHistory(filters);
+        return response;
+      } catch (error) {
+        console.error('❌ [USE_SESSIONS] Erreur historique:', error);
+        throw error;
+      }
+    },
+    keepPreviousData: true,
+    staleTime: 60000,
+    onError: (error) => {
+      showError(error.message || 'Erreur lors de la récupération de l\'historique');
+    }
+  });
+}
 
+/**
+ * ✅ NOUVEAU: Hook pour les statistiques d'un poste
+ */
+export function usePosteStatistics(posteId, dateDebut, dateFin) {
+  const { showError } = useNotification();
+  
+  return useQuery({
+    queryKey: ['poste', 'statistics', posteId, dateDebut, dateFin],
+    queryFn: async () => {
+      try {
+        const response = await sessionService.getPosteStatistics(posteId, { dateDebut, dateFin });
+        return response;
+      } catch (error) {
+        console.error('❌ [USE_SESSIONS] Erreur statistiques poste:', error);
+        throw error;
+      }
+    },
+    enabled: !!posteId,
+    staleTime: 300000, // 5 minutes
+    onError: (error) => {
+      showError(error.message || 'Erreur lors de la récupération des statistiques');
+    }
+  });
+}
 /**
  * ✅ Hook pour calculer le prix d'une session
  */

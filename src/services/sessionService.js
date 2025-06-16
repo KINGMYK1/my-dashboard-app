@@ -77,7 +77,20 @@ const sessionService = {
       }
     });
   },
-
+ /**
+   * ✅ NOUVEAU: Récupérer l'historique des sessions
+   */
+  async getSessionsHistory(filters = {}) {
+    try {
+      console.log('📋 [SESSION_SERVICE] Récupération historique sessions:', filters);
+      
+      const response = await api.get('/sessions/history', { params: filters });
+      return response;
+    } catch (error) {
+      console.error('❌ [SESSION_SERVICE] Erreur historique sessions:', error);
+      throw error;
+    }
+  },
   /**
    * ✅ Récupérer les sessions en pause avec protection
    */
@@ -169,6 +182,20 @@ const sessionService = {
   calculateSessionPrice: (data) => {
     console.log('💰 [SESSION_SERVICE] Calcul prix session:', data);
     return api.post('/sessions/calculer-cout', data);
+  },
+   /**
+   * ✅ NOUVEAU: Récupérer les statistiques d'un poste
+   */
+  async getPosteStatistics(posteId, options = {}) {
+    try {
+      console.log('📊 [SESSION_SERVICE] Récupération statistiques poste:', posteId, options);
+      
+      const response = await api.get(`/sessions/poste/${posteId}/statistics`, { params: options });
+      return response;
+    } catch (error) {
+      console.error('❌ [SESSION_SERVICE] Erreur statistiques poste:', error);
+      throw error;
+    }
   }
 };
 
