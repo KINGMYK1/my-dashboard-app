@@ -3,24 +3,25 @@ import {
   Plus, Search, Edit2, Trash2, Settings, 
   DollarSign, Users, AlertCircle, Tag, Clock, Monitor,
   Gamepad2, Star, TrendingUp, BarChart3, Sparkles,
-  Play, PauseCircle, Eye
+  Play, PauseCircle, Eye, EyeOff, Power, PowerOff
 } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { 
   useTypesPostes, 
   useDeleteTypePoste,
-  useUpdateTypePoste
+  useUpdateTypePoste,
+  useToggleTypePosteStatus // ✅ NOUVEAU: Import du hook toggle
 } from '../../hooks/useTypePostes';
 import { useNotification } from '../../contexts/NotificationContext';
 import TypePosteForm from './TypePosteForm';
 import TypePosteStatistics from './TypePosteStatistics';
+
 import CalculateurTarifs from './CalculateurTarifs';
 import ConfirmationDialog from '../../components/ConfirmationDialog/ConfirmationDialog';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import GamingIcon from '../../components/GamingIcon/GamingIcon';
 import GamingIconService from '../../services/gamingIconService';
-// ...existing code...
 
 const TypesPostes = () => {
   const { translations } = useLanguage();
@@ -35,12 +36,15 @@ const TypesPostes = () => {
   const [showCalculateur, setShowCalculateur] = useState(false);
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('nom');
-  const [showInactive, setShowInactive] = useState(false); // ✅ AJOUT: État pour inclure les inactifs
+  const [showInactive, setShowInactive] = useState(false);
+  const [selectedTypePosteForStats, setSelectedTypePosteForStats] = useState(null);
+  const [showStatsModal, setShowStatsModal] = useState(false);
 
-  // ✅ CORRECTION: Inclure les types inactifs selon l'état
+  // ✅ MISE À JOUR: Utilisation des hooks corrigés
   const { data: typesPostes = [], isLoading, isError, error } = useTypesPostes(showInactive);
   const deleteTypePosteMutation = useDeleteTypePoste();
   const updateTypePosteMutation = useUpdateTypePoste();
+  const toggleStatusMutation = useToggleTypePosteStatus(); // ✅ NOUVEAU
 
   const isDarkMode = effectiveTheme === 'dark';
 
@@ -101,21 +105,19 @@ const TypesPostes = () => {
     }
   };
 
-  const handleToggleStatus = async (typePosteId, newStatus) => {
+  // ✅ NOUVEAU: Gérer le toggle de statut
+  const handleToggleStatus = async (typePosteId) => {
     try {
-      await updateTypePosteMutation.mutateAsync({
-        id: typePosteId,
-        typePosteData: { estActif: newStatus },
-        plansTarifaires: []
-      });
-      showSuccess(`Type de poste ${newStatus ? 'activé' : 'désactivé'} avec succès`);
+      console.log('🔄 [TYPES_POSTES] Toggle status ID:', typePosteId);
+      await toggleStatusMutation.mutateAsync(typePosteId);
     } catch (error) {
-      showError('Erreur lors de la modification du statut');
+      console.error('❌ [TYPES_POSTES] Erreur toggle status:', error);
     }
   };
 
   const handleShowStatistics = (typePoste) => {
-    setShowStatistics(typePoste);
+    setSelectedTypePosteForStats(typePoste);
+    setShowStatsModal(true);
   };
 
   const formatCurrency = (amount) => {
@@ -126,7 +128,62 @@ const TypesPostes = () => {
     }).format(amount);
   };
 
-  // ✅ Styles gaming modérés
+  // ✅ NOUVEAU: Fonction pour vérifier si un type est inactif
+  const isTypePosteInactif = (typePoste) => {
+    return !typePoste.estActif;
+  };
+
+  // ✅ NOUVEAU: Fonction pour afficher les plans avec gestion des inactifs
+  const renderPlansCompacts = (typePoste) => {
+    const plans = typePoste.plansTarifaires || [];
+    const plansActifs = plans.filter(p => p.estActif);
+    const plansInactifs = plans.filter(p => !p.estActif);
+
+    if (plans.length === 0) {
+      return (
+        <div className="text-xs text-gray-500 italic">
+          Aucun plan tarifaire
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        {/* Plans actifs */}
+        {plansActifs.slice(0, 2).map((plan, index) => (
+          <div key={`actif-${index}`} className="flex justify-between items-center text-xs">
+            <span className="text-gray-600 dark:text-gray-400">
+              {plan.nom || `${plan.dureeMinutesMin || plan.dureeMinutes}min`}
+            </span>
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              {plan.prix} {typePoste.devise || 'DH'}
+            </span>
+          </div>
+        ))}
+        
+        {/* Plans inactifs si on affiche les inactifs */}
+        {showInactive && plansInactifs.slice(0, 1).map((plan, index) => (
+          <div key={`inactif-${index}`} className="flex justify-between items-center text-xs opacity-50">
+            <span className="text-gray-500 line-through">
+              {plan.nom || `${plan.dureeMinutesMin || plan.dureeMinutes}min`}
+            </span>
+            <span className="text-gray-500 line-through">
+              {plan.prix} {typePoste.devise || 'DH'}
+            </span>
+          </div>
+        ))}
+        
+        {/* Indicateur s'il y a plus de plans */}
+        {(plansActifs.length + (showInactive ? plansInactifs.length : 0)) > 2 && (
+          <div className="text-xs text-center text-gray-500">
+            +{(plansActifs.length + (showInactive ? plansInactifs.length : 0)) - 2} autres
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Styles gaming modérés (conservés)
   const styles = {
     container: `space-y-4`,
     header: `p-3 rounded-lg ${isDarkMode 
@@ -186,7 +243,7 @@ const TypesPostes = () => {
 
   return (
     <div className="p-4 space-y-4">
-      {/* ✅ Header compact */}
+      {/* Header (conservé avec mise à jour) */}
       <div className={styles.header}>
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-3 lg:space-y-0">
           <div className="flex items-center space-x-3">
@@ -204,6 +261,21 @@ const TypesPostes = () => {
           </div>
           
           <div className="flex space-x-2">
+            {/* ✅ NOUVEAU: Bouton pour afficher/masquer les inactifs */}
+            <button
+              onClick={() => setShowInactive(!showInactive)}
+              className={`flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
+                showInactive
+                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400' 
+                  : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {showInactive ? <EyeOff size={16} /> : <Eye size={16} />}
+              <span className="ml-2">
+                {showInactive ? 'Masquer inactifs' : 'Voir inactifs'}
+              </span>
+            </button>
+
             <button
               onClick={() => setShowCalculateur(true)}
               className={styles.buttonSecondary}
@@ -222,7 +294,7 @@ const TypesPostes = () => {
         </div>
       </div>
 
-      {/* ✅ Filtres compacts */}
+      {/* Filtres (conservés) */}
       <div className={styles.searchBar}>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           {/* Recherche */}
@@ -265,7 +337,7 @@ const TypesPostes = () => {
             </select>
           </div>
 
-          {/* ✅ Toggle pour inclure les inactifs */}
+          {/* ✅ MISE À JOUR: Toggle amélioré */}
           <div className="md:col-span-3">
             <button
               onClick={() => setShowInactive(!showInactive)}
@@ -280,7 +352,7 @@ const TypesPostes = () => {
           </div>
         </div>
 
-        {/* Stats rapides compactes */}
+        {/* Stats rapides (conservées avec mise à jour) */}
         {typesPostes.length > 0 && (
           <div className="grid grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-500/20">
             <div className="text-center">
@@ -311,7 +383,7 @@ const TypesPostes = () => {
         )}
       </div>
 
-      {/* ✅ Grille de cartes compactes */}
+      {/* Grille de cartes (conservée avec mise à jour du composant) */}
       {filteredAndSortedTypesPostes.length === 0 ? (
         <div className={`${isDarkMode ? 'bg-gray-800/20' : 'bg-white/50'} rounded-lg p-6 border-2 border-dashed ${isDarkMode ? 'border-gray-600' : 'border-gray-300'} text-center`}>
           <Gamepad2 className={`mx-auto mb-3 ${styles.textMuted}`} size={40} />
@@ -350,12 +422,16 @@ const TypesPostes = () => {
               translations={translations}
               isDarkMode={isDarkMode}
               styles={styles}
+              isTypePosteInactif={isTypePosteInactif}
+              renderPlansCompacts={renderPlansCompacts}
+              showInactive={showInactive}
+              toggleStatusMutation={toggleStatusMutation} // ✅ NOUVEAU
             />
           ))}
         </div>
       )}
 
-      {/* Modales */}
+      {/* Modales (conservées) */}
       {isFormOpen && (
         <TypePosteForm
           typePoste={selectedTypePoste}
@@ -377,7 +453,7 @@ const TypesPostes = () => {
         />
       )}
 
-      {/* Dialogue de confirmation */}
+      {/* Dialogue de confirmation (conservé) */}
       <ConfirmationDialog
         isOpen={!!typePosteToDelete}
         onClose={() => setTypePosteToDelete(null)}
@@ -393,11 +469,43 @@ const TypesPostes = () => {
         loading={deleteTypePosteMutation.isPending}
         isDestructive={true}
       />
+
+      {/* Modal ou section pour les statistiques */}
+      {showStatsModal && selectedTypePosteForStats && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`max-w-6xl w-full max-h-[90vh] overflow-y-auto rounded-lg shadow-xl ${
+            isDarkMode ? 'bg-gray-900' : 'bg-white'
+          }`}>
+            <div className={`p-4 border-b ${
+              isDarkMode ? 'border-gray-700' : 'border-gray-200'
+            } flex justify-between items-center`}>
+              <h2 className={`text-xl font-semibold ${
+                isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                Statistiques détaillées
+              </h2>
+              <button
+                onClick={() => setShowStatsModal(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <TypePosteStatistics
+                typePosteId={selectedTypePosteForStats.id}
+                typePosteName={selectedTypePosteForStats.nom}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// ✅ Composant de carte compact
+// ✅ MISE À JOUR: Composant de carte avec nouvelles fonctionnalités
 const TypePosteCard = ({ 
   typePoste, 
   onEdit, 
@@ -407,7 +515,11 @@ const TypePosteCard = ({
   formatCurrency, 
   translations, 
   isDarkMode,
-  styles
+  styles,
+  isTypePosteInactif,
+  renderPlansCompacts,
+  showInactive,
+  toggleStatusMutation
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -432,19 +544,23 @@ const TypePosteCard = ({
           : undefined
       }}
     >
-      {/* Badge compact */}
+      {/* ✅ MISE À JOUR: Badge de statut amélioré */}
       <div className="absolute top-2 right-2 z-10">
-        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-          typePoste.estActif 
-            ? 'bg-green-500/20 text-green-400' 
-            : 'bg-red-500/20 text-red-400'
-        }`}>
-          {typePoste.estActif ? '🟢' : '🔴'}
-        </div>
+        {isTypePosteInactif(typePoste) && (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">
+            Inactif
+          </span>
+        )}
       </div>
 
+      {/* ✅ MISE À JOUR: Barre de couleur conditionnelle */}
+      <div 
+        className="h-2 w-full"
+        style={{ backgroundColor: typePoste.estActif ? (typePoste.couleur || '#8b5cf6') : '#6b7280' }}
+      />
+
       <div className="p-3">
-        {/* Header compact */}
+        {/* Header (conservé avec amélioration) */}
         <div className="flex items-start space-x-2 mb-3">
           <div 
             className="p-1.5 rounded-lg border"
@@ -461,60 +577,70 @@ const TypePosteCard = ({
           </div>
           
           <div className="flex-1 min-w-0">
-            <h3 className={`text-sm font-semibold ${styles.textPrimary} line-clamp-1`}>
+            <h3 className={`text-sm font-semibold line-clamp-1 ${
+              isTypePosteInactif(typePoste) 
+                ? 'text-gray-500 line-through' 
+                : styles.textPrimary
+            }`}>
               {typePoste.nom}
             </h3>
             {typePoste.description && (
-              <p className={`text-xs ${styles.textMuted} line-clamp-1 mt-0.5`}>
+              <p className={`text-xs line-clamp-1 mt-0.5 ${
+                isTypePosteInactif(typePoste) 
+                  ? 'text-gray-400' 
+                  : styles.textMuted
+              }`}>
                 {typePoste.description}
               </p>
             )}
           </div>
         </div>
 
-        {/* Métriques compactes */}
+        {/* Métriques (conservées avec amélioration) */}
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div className="text-center p-2 rounded bg-blue-500/10 border border-blue-500/20">
-            <div className={`text-xs font-bold ${styles.textPrimary}`}>
-              {typePoste.tarifHoraireBase} DH
+            <div className={`text-xs font-bold ${
+              isTypePosteInactif(typePoste) ? 'text-gray-500' : styles.textPrimary
+            }`}>
+              {typePoste.tarifHoraireBase} {typePoste.devise || 'DH'}
             </div>
             <div className={`text-xs ${styles.textMuted}`}>Tarif/h</div>
           </div>
           
           <div className="text-center p-2 rounded bg-purple-500/10 border border-purple-500/20">
-            <div className={`text-xs font-bold ${styles.textPrimary}`}>
+            <div className={`text-xs font-bold ${
+              isTypePosteInactif(typePoste) ? 'text-gray-500' : styles.textPrimary
+            }`}>
               {typePoste.plansTarifaires?.length || 0}
             </div>
             <div className={`text-xs ${styles.textMuted}`}>Plans</div>
           </div>
         </div>
 
-        {/* Plans compacts */}
+        {/* ✅ MISE À JOUR: Plans avec gestion des inactifs */}
         {typePoste.plansTarifaires && typePoste.plansTarifaires.length > 0 && (
           <div className="mb-3">
-            <div className="space-y-1">
-              {typePoste.plansTarifaires.slice(0, 2).map((plan, index) => (
-                <div key={index} className="flex justify-between items-center text-xs">
-                  <span className={styles.textMuted}>
-                    {plan.nom || `${plan.dureeMinutes}min`}
-                  </span>
-                  <span className={`font-medium ${styles.textPrimary}`}>
-                    {plan.prix} DH
-                  </span>
-                </div>
-              ))}
-              {typePoste.plansTarifaires.length > 2 && (
-                <div className={`text-xs ${styles.textMuted} text-center`}>
-                  +{typePoste.plansTarifaires.length - 2} autres
-                </div>
-              )}
-            </div>
+            {renderPlansCompacts(typePoste)}
           </div>
         )}
 
-        {/* Actions compactes */}
+        {/* ✅ MISE À JOUR: Actions avec bouton toggle */}
         <div className="flex justify-between items-center pt-2 border-t border-gray-500/20">
           <div className="flex space-x-1">
+            {/* Toggle status */}
+            <button
+              onClick={() => onToggleStatus(typePoste.id)}
+              disabled={toggleStatusMutation.isLoading}
+              className={`p-1.5 rounded transition-all hover:scale-110 ${
+                isTypePosteInactif(typePoste)
+                  ? 'bg-green-500/80 hover:bg-green-600/90 text-white'
+                  : 'bg-orange-500/80 hover:bg-orange-600/90 text-white'
+              }`}
+              title={isTypePosteInactif(typePoste) ? 'Activer' : 'Désactiver'}
+            >
+              {isTypePosteInactif(typePoste) ? <Power size={14} /> : <PowerOff size={14} />}
+            </button>
+
             <button
               onClick={() => onEdit(typePoste)}
               className="p-1.5 bg-blue-500/80 hover:bg-blue-600/90 text-white rounded transition-all hover:scale-110"
@@ -522,23 +648,13 @@ const TypePosteCard = ({
             >
               <Edit2 size={14} />
             </button>
+
             <button
               onClick={() => onShowStatistics(typePoste)}
               className="p-1.5 bg-purple-500/80 hover:bg-purple-600/90 text-white rounded transition-all hover:scale-110"
               title="Stats"
             >
               <BarChart3 size={14} />
-            </button>
-            <button
-              onClick={() => onToggleStatus(typePoste.id, !typePoste.estActif)}
-              className={`p-1.5 rounded transition-all hover:scale-110 ${
-                typePoste.estActif 
-                  ? 'bg-orange-500/80 hover:bg-orange-600/90 text-white' 
-                  : 'bg-green-500/80 hover:bg-green-600/90 text-white'
-              }`}
-              title={typePoste.estActif ? 'Désactiver' : 'Activer'}
-            >
-              {typePoste.estActif ? <PauseCircle size={14} /> : <Play size={10} />}
             </button>
           </div>
           
@@ -551,13 +667,17 @@ const TypePosteCard = ({
           </button>
         </div>
 
-        {/* Barre de performance compacte */}
+        {/* Barre de performance (conservée avec amélioration) */}
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200 dark:bg-gray-700 rounded-b-lg overflow-hidden">
           <div 
-            className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-1000"
+            className={`h-full transition-all duration-1000 ${
+              typePoste.estActif 
+                ? 'bg-gradient-to-r from-green-400 to-blue-500' 
+                : 'bg-gradient-to-r from-gray-400 to-gray-500'
+            }`}
             style={{ 
               width: `${Math.min(100, (typePoste.plansTarifaires?.length || 0) * 25 + 25)}%`,
-              boxShadow: `0 0 8px ${typePoste.couleur || '#8b5cf6'}60`
+              boxShadow: typePoste.estActif ? `0 0 8px ${typePoste.couleur || '#8b5cf6'}60` : undefined
             }}
           />
         </div>

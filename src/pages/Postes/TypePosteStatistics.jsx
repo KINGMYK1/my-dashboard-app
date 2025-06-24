@@ -1,16 +1,112 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, BarChart3, TrendingUp, DollarSign, Clock, Users, Calendar } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useTypePosteStatistics } from '../../hooks/useTypePostes';
+import { useTypePosteStatistics } from '../../hooks/useTypePostesStatistics';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 
-const TypePosteStatistics = ({ typePoste, onClose }) => {
+const TypePosteStatistics = ({ typePosteId, typePosteName, onClose }) => {
   const { translations } = useLanguage();
   const { effectiveTheme } = useTheme();
   const isDarkMode = effectiveTheme === 'dark';
 
-  const { data: statistics, isLoading, isError } = useTypePosteStatistics(typePoste?.id);
+  const [periode, setPeriode] = useState('mois');
+  const [includeDetails, setIncludeDetails] = useState(true);
+
+  // ✅ Hook pour récupérer les statistiques
+  const { 
+    data: statistiques, 
+    isLoading, 
+    isError, 
+    error,
+    refetch
+  } = useTypePosteStatistics(typePosteId, {
+    periode,
+    includePostesDetails: includeDetails,
+    includeRevenus: true
+  });
+
+  // ✅ Traitement des données statistiques
+  const statsData = useMemo(() => {
+    if (!statistiques?.data) return null;
+    
+    const data = statistiques.data;
+    console.log('📊 [STATS_COMPONENT] Données traitées:', data);
+    
+    return {
+      typePoste: data.typePoste || {},
+      postes: data.postes || {},
+      plans: data.plans || {},
+      rentabilite: data.rentabilite || {},
+      dateCalcul: data.dateCalcul
+    };
+  }, [statistiques]);
+
+  // ✅ Formatage des valeurs
+  const formatCurrency = (value) => {
+    if (!value || isNaN(value)) return '0,00 MAD';
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: 'MAD',
+      minimumFractionDigits: 2
+    }).format(value);
+  };
+
+  const formatPercentage = (value) => {
+    if (!value || isNaN(value)) return '0%';
+    return `${(value * 100).toFixed(1)}%`;
+  };
+
+  const formatDuration = (hours) => {
+    if (!hours || isNaN(hours)) return '0h 0min';
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}h ${m}min`;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <LoadingSpinner text="Chargement des statistiques..." />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className={`p-6 rounded-lg border ${
+        isDarkMode ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200'
+      }`}>
+        <div className="flex items-center space-x-2 mb-2">
+          <span className="text-red-500">⚠️</span>
+          <h3 className={`font-medium ${isDarkMode ? 'text-red-400' : 'text-red-700'}`}>
+            Erreur lors du chargement
+          </h3>
+        </div>
+        <p className={`text-sm ${isDarkMode ? 'text-red-300' : 'text-red-600'}`}>
+          {error?.message || 'Impossible de charger les statistiques'}
+        </p>
+        <button
+          onClick={() => refetch()}
+          className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  if (!statsData) {
+    return (
+      <div className={`p-6 rounded-lg ${
+        isDarkMode ? 'bg-gray-800' : 'bg-gray-50'
+      }`}>
+        <p className={`text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          Aucune donnée statistique disponible
+        </p>
+      </div>
+    );
+  }
 
   // Styles dynamiques basés sur le thème
   const getBgColorClass = () => isDarkMode ? 'bg-gray-800' : 'bg-white';
@@ -19,20 +115,6 @@ const TypePosteStatistics = ({ typePoste, onClose }) => {
     : (isPrimary ? 'text-gray-900' : 'text-gray-600');
   const getBorderColorClass = () => isDarkMode ? 'border-gray-700' : 'border-gray-200';
   const getCardBgClass = () => isDarkMode ? 'bg-gray-700' : 'bg-gray-50';
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('fr-MA', {
-      style: 'currency',
-      currency: 'MAD',
-      minimumFractionDigits: 2
-    }).format(amount || 0);
-  };
-
-  const formatPercentage = (value) => {
-    return `${(value || 0).toFixed(1)}%`;
-  };
-
-  if (!typePoste) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">

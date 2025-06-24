@@ -6,6 +6,9 @@ class AuthService {
     this.user = JSON.parse(localStorage.getItem('user') || 'null');
   }
 
+  /**
+   * ✅ AMÉLIORATION: Connexion avec options pour forcer la régénération QR
+   */
   async login(credentials, options = {}) {
     try {
       const response = await api.post('/auth/login', {
@@ -39,6 +42,7 @@ class AuthService {
         return result;
       }
       
+      // Connexion réussie sans 2FA
       if (response.success && response.token && response.user) {
         this.token = response.token;
         this.user = response.user;
@@ -63,6 +67,16 @@ class AuthService {
     }
   }
 
+  /**
+   * ✅ AMÉLIORATION: Connexion avec régénération forcée du QR Code
+   */
+  async loginWithQRRegeneration(credentials) {
+    return this.login(credentials, { forceQRCodeRegeneration: true });
+  }
+
+  /**
+   * Vérification 2FA adaptée au backend amélioré
+   */
   async verifyTwoFactor(tempToken, twoFactorCode) {
     try {
       const response = await api.post('/auth/verify-2fa', {
@@ -94,6 +108,9 @@ class AuthService {
     }
   }
 
+  /**
+   * ✅ NOUVEAUTÉ: Récupération du statut 2FA
+   */
   async getTwoFactorStatus() {
     try {
       const response = await api.get('/auth/2fa/status');
@@ -109,6 +126,9 @@ class AuthService {
     }
   }
 
+  /**
+   * ✅ NOUVEAUTÉ: Activation 2FA avec gestion des cycles
+   */
   async enableTwoFactor(forceNewSecret = false) {
     try {
       const response = await api.post('/auth/2fa/enable', {
@@ -134,8 +154,13 @@ class AuthService {
     }
   }
 
+  /**
+   * ✅ NOUVEAUTÉ: Désactivation 2FA complète
+   */
   async disableTwoFactor(keepSecret = false) {
     try {
+      console.log('🔓 [AUTH] Désactivation 2FA, conserver secret:', keepSecret);
+      
       const response = await api.post('/auth/2fa/disable', {
         keepSecret
       });
@@ -157,6 +182,9 @@ class AuthService {
     }
   }
 
+  /**
+   * ✅ NOUVEAUTÉ: Régénération du secret 2FA
+   */
   async regenerateTwoFactorSecret() {
     try {
       const response = await api.post('/auth/2fa/regenerate');
@@ -178,6 +206,9 @@ class AuthService {
     }
   }
 
+  /**
+   * Déconnexion adaptée au backend AuthController.logout
+   */
   async logout() {
     try {
       if (this.token && this.user) {
@@ -190,6 +221,9 @@ class AuthService {
     }
   }
 
+  /**
+   * Vérifier si l'utilisateur est connecté
+   */
   isAuthenticated() {
     if (!this.token || !this.user) {
       return false;
@@ -197,6 +231,7 @@ class AuthService {
 
     const expiry = localStorage.getItem('tokenExpiry');
     if (expiry && new Date(expiry) <= new Date()) {
+      console.log('🔒 [AUTH] Token expiré');
       this.clearAuthData();
       return false;
     }
@@ -204,10 +239,16 @@ class AuthService {
     return true;
   }
 
+  /**
+   * Obtenir l'utilisateur connecté
+   */
   getCurrentUser() {
     return this.user;
   }
 
+  /**
+   * Vérifier si l'utilisateur a une permission
+   */
   hasPermission(permission) {
     if (!this.user || !this.user.role || !this.user.role.permissions) {
       return false;
@@ -217,6 +258,9 @@ class AuthService {
            this.user.role.permissions.includes('ADMIN');
   }
 
+  /**
+   * Vérifier si l'utilisateur a un rôle spécifique
+   */
   hasRole(roleName) {
     if (!this.user || !this.user.role) {
       return false;
@@ -224,10 +268,16 @@ class AuthService {
     return this.user.role.name === roleName;
   }
 
+  /**
+   * Obtenir le token actuel
+   */
   getToken() {
     return this.token;
   }
 
+  /**
+   * Configurer l'en-tête d'authentification pour axios
+   */
   setAuthHeader() {
     if (this.token) {
       api.defaults.headers.common['Authorization'] = `Bearer ${this.token}`;
@@ -236,6 +286,9 @@ class AuthService {
     }
   }
 
+  /**
+   * Nettoyer les données d'authentification
+   */
   clearAuthData() {
     this.token = null;
     this.user = null;
@@ -247,6 +300,9 @@ class AuthService {
     delete api.defaults.headers.common['Authorization'];
   }
 
+  /**
+   * Initialisation au démarrage de l'application
+   */
   init() {
     if (this.isAuthenticated()) {
       this.setAuthHeader();
@@ -257,6 +313,9 @@ class AuthService {
     }
   }
 
+  /**
+   * Récupérer le profil utilisateur depuis le backend
+   */
   async getUserProfile() {
     try {
       const response = await api.get('/users/profile');

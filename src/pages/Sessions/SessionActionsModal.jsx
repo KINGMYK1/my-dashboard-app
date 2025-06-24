@@ -1,444 +1,354 @@
 import React, { useState, useEffect } from 'react';
-import { X, Square, Clock, XCircle, Pause, Play, Plus, CheckCircle, Euro } from 'lucide-react';
+import { X, PlayCircle, PauseCircle, Plus, StopCircle, AlertTriangle, Settings } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useLanguage } from '../../contexts/LanguageContext';
-import { useNotification } from '../../contexts/NotificationContext';
-import Portal from '../Portal/Portal';
+import Portal from '../../components/Portal/Portal';
+import SessionPauseModal from './modals/SessionPauseModal';
+import SessionExtendModal from './modals/SessionExtendModal';
+import SessionTerminateModal from './modals/SessionTerminateModal';
+import SessionCancelModal from './modals/SessionCancelModal';
 
-const SessionActionsModal = ({
-  isOpen,
-  onClose,
-  session,
-  onAction,
+const SessionActionsModal = ({ 
+  session, 
+  isOpen, 
+  onClose, 
+  onAction 
 }) => {
-  const [actionType, setActionType] = useState(null);
-  const [formData, setFormData] = useState({
-    raison: '',
-    notes: '',
-    modePaiement: 'ESPECES',
-    montantPaye: '',
-    marquerCommePayee: false,
-    dureeSupplementaireMinutes: '30',
-  });
-  const [loading, setLoading] = useState(false);
-
   const { effectiveTheme } = useTheme();
-  const { translations } = useLanguage();
-  const { showSuccess, showError, showWarning } = useNotification();
   const isDarkMode = effectiveTheme === 'dark';
 
-  // Réinitialiser le formulaire
+  const [activeSubModal, setActiveSubModal] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  // ✅ Calcul du montant estimé
+  const montantEstime = React.useMemo(() => {
+    if (!session) return 0;
+
+    const now = new Date();
+    const startTime = new Date(session.dateHeureDebut);
+    const pauseTimeMs = (session.tempsPauseTotalMinutes || 0) * 60 * 1000;
+    
+    const elapsedMs = Math.max(0, now.getTime() - startTime.getTime() - pauseTimeMs);
+    const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+
+    if (session.planTarifaire) {
+      return parseFloat(session.planTarifaire.prix || 0);
+    }
+
+    const tarifHoraire = session.poste?.typePoste?.tarifHoraireBase || 25;
+    return (elapsedMinutes / 60) * tarifHoraire;
+  }, [session]);
+
   useEffect(() => {
     if (isOpen && session) {
-      setActionType(null);
-      setFormData({
-        raison: '',
-        notes: '',
-        modePaiement: 'ESPECES',
-        montantPaye: session?.montantTotal?.toString() || '',
-        marquerCommePayee: false,
-        dureeSupplementaireMinutes: '30',
+      console.log('🔧 [SESSION_ACTIONS] Session reçue:', {
+        id: session.id,
+        numeroSession: session.numeroSession,
+        poste: session.poste?.nom,
+        statut: session.statut
       });
+      setActiveSubModal(null);
+      setErrors({});
+      setIsSubmitting(false);
     }
   }, [isOpen, session]);
 
-  const handleActionChange = (action) => {
-    console.log('🎯 Action sélectionnée:', action);
-    setActionType(action);
+  // ✅ CORRECTION: Actions directes avec debug de l'ID
+  const handleDirectAction = async (action) => {
+    const sessionId = session?.id;
+    
+    console.log('🔍 [SESSION_ACTIONS] Debug ID session:', {
+      sessionObject: session,
+      sessionId: sessionId,
+      sessionIdType: typeof sessionId,
+      sessionIdParsed: parseInt(sessionId),
+      isValid: !isNaN(parseInt(sessionId)) && parseInt(sessionId) > 0
+    });
+    
+    if (!sessionId || isNaN(parseInt(sessionId)) || parseInt(sessionId) <= 0) {
+      console.error('❌ [SESSION_ACTIONS] ID de session invalide:', sessionId);
+      setErrors({ submit: 'ID de session invalide ou manquant' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrors({});
+    
+    try {
+      console.log(`🚀 [SESSION_ACTIONS] Action directe ${action} pour session ID: ${sessionId}`);
+      await onAction(action, parseInt(sessionId));
+      onClose();
+    } catch (error) {
+      console.error(`❌ [SESSION_ACTIONS] Erreur ${action}:`, error);
+      setErrors({ submit: error.message || `Erreur lors de l'action ${action}` });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleOpenSubModal = (modalType) => {
+    const sessionId = session?.id;
+    
+    if (!sessionId || isNaN(parseInt(sessionId))) {
+      console.error('❌ [SESSION_ACTIONS] ID de session invalide pour sous-modal:', sessionId);
+      setErrors({ submit: 'ID de session invalide' });
+      return;
+    }
+
+    console.log(`🔄 [SESSION_ACTIONS] Ouverture sous-modal: ${modalType} pour session ID: ${sessionId}`);
+    setActiveSubModal(modalType);
+    setErrors({});
   };
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    handleInputChange(name, type === 'checkbox' ? checked : value);
+  const handleCloseSubModal = () => {
+    console.log('🔄 [SESSION_ACTIONS] Fermeture sous-modal');
+    setActiveSubModal(null);
+    setErrors({});
   };
 
-  // ✅ CORRECTION: Logique de soumission corrigée
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!actionType) return;
-
-    console.log('🚀 Soumission action:', actionType, formData);
+  // ✅ CORRECTION: Dans le gestionnaire de sous-modal
+  const handleSubModalAction = async (action, sessionId, data = {}) => {
+    if (!sessionId || isNaN(parseInt(sessionId))) {
+      setErrors({ submit: 'ID de session invalide' });
+      return;
+    }
 
     try {
-      setLoading(true);
+      // ✅ CORRECTION: Logs détaillés pour debug
+      console.log('🚀 [SESSION_ACTIONS] Action sous-modal AVANT traitement:', {
+        action: action,
+        sessionId: sessionId,
+        dataReceived: data,
+        dataType: typeof data,
+        dataKeys: Object.keys(data || {}),
+        dataEntries: Object.entries(data || {})
+      });
 
-      // Validation selon l'action
-      switch (actionType) {
-        case 'pause':
-          if (!formData.raison.trim()) {
-            showError('Veuillez saisir une raison pour la pause');
-            return;
-          }
-          break;
-
-        case 'prolonger':
-          if (!formData.dureeSupplementaireMinutes || parseInt(formData.dureeSupplementaireMinutes) <= 0) {
-            showError('Veuillez saisir une durée de prolongation valide');
-            return;
-          }
-          break;
-
-        case 'terminer':
-          if (!formData.modePaiement) {
-            showError('Veuillez sélectionner un mode de paiement');
-            return;
-          }
-          if (isNaN(parseFloat(formData.montantPaye)) || parseFloat(formData.montantPaye) < 0) {
-            showError('Veuillez saisir un montant payé valide');
-            return;
-          }
-          break;
-
-        case 'annuler':
-          if (!formData.raison.trim()) {
-            showError('Veuillez saisir une raison pour l\'annulation');
-            return;
-          }
-          break;
+      // ✅ Traitement spécial pour terminaison
+      if (action === 'terminer') {
+        console.log('🛑 [SESSION_ACTIONS] Données de terminaison détaillées:', {
+          montantPaye: data.montantPaye,
+          montantPayeType: typeof data.montantPaye,
+          modePaiement: data.modePaiement,
+          marquerCommePayee: data.marquerCommePayee,
+          notes: data.notes
+        });
       }
 
-      // ✅ CORRECTION: Appel de la fonction onAction avec les bonnes données
-      console.log('📤 Envoi des données vers parent:', actionType, formData);
-      
-      // Appeler la fonction parent
-      await onAction(actionType, formData);
-      
-      // Le succès est géré dans le composant parent
+      await onAction(action, parseInt(sessionId), data);
+      setActiveSubModal(null);
       onClose();
-
     } catch (error) {
-      console.error('❌ Erreur action:', error);
-      showError(error.message || `Erreur lors de l'action ${actionType}`);
-    } finally {
-      setLoading(false);
+      console.error(`❌ [SESSION_ACTIONS] Erreur sous-modal ${action}:`, error);
+      setErrors({ submit: error.message || `Erreur lors de l'action ${action}` });
     }
   };
 
   if (!isOpen || !session) return null;
 
-  // Styles
-  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
-  const textPrimary = isDarkMode ? 'text-white' : 'text-gray-900';
-  const textSecondary = isDarkMode ? 'text-gray-300' : 'text-gray-600';
-  const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
-  const inputClass = `w-full p-3 border rounded-lg ${
-    isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'
-  } focus:outline-none focus:ring-2 focus:ring-blue-500`;
-  const labelClass = `block text-sm font-medium mb-2 ${textPrimary}`;
+  const sessionId = session?.id;
+  if (!sessionId || isNaN(parseInt(sessionId))) {
+    return (
+      <Portal>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`max-w-md w-full rounded-lg shadow-xl p-6 ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
+            <div className="text-center">
+              <h2 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                ❌ Erreur
+              </h2>
+              <p className={`mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                ID de session invalide: {sessionId} (Type: {typeof sessionId})
+              </p>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      </Portal>
+    );
+  }
 
-  // ✅ Actions disponibles selon l'état de la session
-  const getAvailableActions = () => {
-    const actions = [];
+  // ✅ Rendu des sous-modaux
+  if (activeSubModal) {
+    const commonProps = {
+      session,
+      isOpen: true,
+      onClose: handleCloseSubModal,
+      onAction: handleSubModalAction,
+      montantEstime
+    };
 
-    if (session.statut === 'EN_COURS') {
-      actions.push({
-        id: 'pause',
-        label: 'Mettre en pause',
-        icon: Pause,
-        color: 'bg-orange-600 hover:bg-orange-700',
-        description: 'Suspendre temporairement la session'
-      });
-
-      actions.push({
-        id: 'prolonger',
-        label: 'Prolonger',
-        icon: Plus,
-        color: 'bg-blue-600 hover:bg-blue-700',
-        description: 'Ajouter du temps à la session'
-      });
-
-      actions.push({
-        id: 'terminer',
-        label: 'Terminer',
-        icon: Square,
-        color: 'bg-green-600 hover:bg-green-700',
-        description: 'Terminer la session et procéder au paiement'
-      });
-    }
-
-    if (session.statut === 'EN_PAUSE') {
-      actions.push({
-        id: 'reprendre',
-        label: 'Reprendre',
-        icon: Play,
-        color: 'bg-green-600 hover:bg-green-700',
-        description: 'Reprendre le chronométrage de la session'
-      });
-
-      actions.push({
-        id: 'terminer',
-        label: 'Terminer',
-        icon: Square,
-        color: 'bg-red-600 hover:bg-red-700',
-        description: 'Terminer définitivement la session'
-      });
-    }
-
-    // Action d'annulation toujours disponible
-    actions.push({
-      id: 'annuler',
-      label: 'Annuler la session',
-      icon: XCircle,
-      color: 'bg-red-600 hover:bg-red-700',
-      description: 'Annuler la session sans facturation'
-    });
-
-    return actions;
-  };
-
-  const availableActions = getAvailableActions();
-
-  const renderActionForm = () => {
-    if (!actionType) return null;
-
-    switch (actionType) {
+    switch (activeSubModal) {
       case 'pause':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Raison de la pause *</label>
-              <input
-                type="text"
-                name="raison"
-                value={formData.raison}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="Pause client, problème technique..."
-                required
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Notes (optionnel)</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                className={inputClass}
-                rows={3}
-                placeholder="Notes additionnelles..."
-              />
-            </div>
-          </div>
-        );
-
-      case 'reprendre':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Notes (optionnel)</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                className={inputClass}
-                rows={3}
-                placeholder="Notes sur la reprise de session..."
-              />
-            </div>
-          </div>
-        );
-
-      case 'prolonger':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Durée supplémentaire (minutes) *</label>
-              <select
-                name="dureeSupplementaireMinutes"
-                value={formData.dureeSupplementaireMinutes}
-                onChange={handleChange}
-                className={inputClass}
-                required
-              >
-                <option value="15">15 minutes</option>
-                <option value="30">30 minutes</option>
-                <option value="60">1 heure</option>
-                <option value="120">2 heures</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Notes (optionnel)</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                className={inputClass}
-                rows={3}
-                placeholder="Raison de la prolongation..."
-              />
-            </div>
-          </div>
-        );
-
-      case 'terminer':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Mode de paiement *</label>
-              <select
-                name="modePaiement"
-                value={formData.modePaiement}
-                onChange={handleChange}
-                className={inputClass}
-                required
-              >
-                <option value="ESPECES">Espèces</option>
-                <option value="CARTE">Carte bancaire</option>
-                <option value="VIREMENT">Virement</option>
-                <option value="CHEQUE">Chèque</option>
-                <option value="GRATUIT">Gratuit</option>
-              </select>
-            </div>
-
-            <div>
-              <label className={labelClass}>Montant payé *</label>
-              <input
-                type="number"
-                name="montantPaye"
-                step="0.01"
-                value={formData.montantPaye}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="Montant en MAD"
-                required
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="marquerCommePayee"
-                name="marquerCommePayee"
-                checked={formData.marquerCommePayee}
-                onChange={handleChange}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <label htmlFor="marquerCommePayee" className={`text-sm ${textSecondary}`}>
-                Marquer comme payée
-              </label>
-            </div>
-
-            <div>
-              <label className={labelClass}>Notes de fin de session</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                className={inputClass}
-                rows={3}
-                placeholder="Observations, incidents, satisfaction client..."
-              />
-            </div>
-          </div>
-        );
-
-      case 'annuler':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClass}>Raison de l'annulation *</label>
-              <textarea
-                name="raison"
-                value={formData.raison}
-                onChange={handleChange}
-                className={inputClass}
-                rows={3}
-                placeholder="Problème technique, demande client..."
-                required
-              />
-            </div>
-          </div>
-        );
-
+        return <SessionPauseModal {...commonProps} />;
+      case 'extend':
+        return <SessionExtendModal {...commonProps} />;
+      case 'terminate':
+        return <SessionTerminateModal {...commonProps} />;
+      case 'cancel':
+        return <SessionCancelModal {...commonProps} />;
       default:
-        return null;
+        setActiveSubModal(null);
+        break;
     }
-  };
+  }
 
   return (
     <Portal>
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-        <div className={`${bgClass} rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto`}>
-          {/* En-tête */}
-          <div className={`flex items-center justify-between p-6 border-b ${borderClass}`}>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className={`max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-lg shadow-xl ${
+          isDarkMode ? 'bg-gray-800' : 'bg-white'
+        }`}>
+          
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
             <div>
-              <h2 className={`text-xl font-bold ${textPrimary}`}>
-                Actions de session
+              <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                🎮 Gérer la Session
               </h2>
-              <p className={`text-sm ${textSecondary} mt-1`}>
-                {session.poste?.nom || session.Poste?.nom} - {session.statut}
+              <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Session #{session.numeroSession} - {session.poste?.nom} (ID: {sessionId})
               </p>
             </div>
             <button
               onClick={onClose}
-              className={`p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 ${textSecondary}`}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <X size={20} />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Contenu */}
-          <div className="p-6">
-            {!actionType ? (
-              <div className="space-y-3">
-                <p className={`text-sm ${textSecondary} mb-4`}>
-                  Choisissez une action à effectuer :
-                </p>
-                {availableActions.map((action) => (
-                  <button
-                    key={action.id}
-                    onClick={() => handleActionChange(action.id)}
-                    className={`w-full p-4 rounded-lg ${action.color} text-white hover:opacity-90 transition-all duration-200 flex items-center space-x-3`}
-                  >
-                    <action.icon size={20} />
-                    <div className="text-left">
-                      <div className="font-medium">{action.label}</div>
-                      <div className="text-sm text-white/80">{action.description}</div>
-                    </div>
-                  </button>
-                ))}
+          <div className="p-6 space-y-6">
+            
+            {/* Informations de la session */}
+            <div className={`p-4 rounded-lg border ${
+              isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <h3 className={`font-medium mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                📊 Informations de la session
+              </h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Client:</p>
+                  <p className={isDarkMode ? 'text-white' : 'text-gray-900'}>
+                    {session.client ? `${session.client.prenom} ${session.client.nom}` : 'Session anonyme'}
+                  </p>
+                </div>
+                <div>
+                  <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Statut:</p>
+                  <p className={`font-medium ${
+                    session.statut === 'EN_COURS' ? 'text-green-600' :
+                    session.statut === 'EN_PAUSE' ? 'text-orange-600' :
+                    'text-gray-600'
+                  }`}>
+                    {session.statut === 'EN_COURS' ? '🟢 En cours' :
+                     session.statut === 'EN_PAUSE' ? '🟡 En pause' :
+                     session.statut}
+                  </p>
+                </div>
+                <div>
+                  <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Montant estimé:</p>
+                  <p className={`font-bold text-green-600`}>
+                    💰 {montantEstime.toFixed(2)} MAD
+                  </p>
+                </div>
+                <div>
+                  <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Jeu:</p>
+                  <p className={isDarkMode ? 'text-white' : 'text-gray-900'}>
+                    🎮 {session.jeuPrincipal || 'Non spécifié'}
+                  </p>
+                </div>
               </div>
-            ) : (
-              <form onSubmit={handleSubmit}>
-                <div className="flex items-center space-x-2 mb-4">
-                  <button
-                    type="button"
-                    onClick={() => setActionType(null)}
-                    className={`text-sm ${textSecondary} hover:underline`}
-                  >
-                    ← Retour aux actions
-                  </button>
-                </div>
-                
-                {renderActionForm()}
+            </div>
 
-                <div className="flex space-x-3 mt-6">
+            {/* Actions rapides */}
+            <div>
+              <h3 className={`font-medium mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                ⚡ Actions rapides
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Actions selon le statut */}
+                {session.statut === 'EN_COURS' && (
+                    <button
+                    onClick={() => handleOpenSubModal('pause')}
+                      disabled={isSubmitting}
+                      className="flex items-center justify-center space-x-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
+                    >
+                      <PauseCircle className="w-5 h-5" />
+                    <span>⏸️ Mettre en pause</span>
+                    </button>
+                )}
+
+                {session.statut === 'EN_PAUSE' && (
                   <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center"
+                    onClick={() => handleDirectAction('reprendre')}
+                    disabled={isSubmitting}
+                    className="flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
-                    {loading ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      'Confirmer'
-                    )}
+                    <PlayCircle className="w-5 h-5" />
+                    <span>▶️ Reprendre</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setActionType(null)}
-                    disabled={loading}
-                    className="flex-1 bg-gray-600 hover:bg-gray-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg font-medium"
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </form>
+                )}
+
+                {/* Prolonger */}
+                <button
+                  onClick={() => handleOpenSubModal('extend')}
+                  disabled={isSubmitting}
+                  className="flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>⏰ Prolonger</span>
+                </button>
+
+                {/* ✅ REMIS: Annuler */}
+                <button
+                  onClick={() => handleOpenSubModal('cancel')}
+                  disabled={isSubmitting}
+                  className="flex items-center justify-center space-x-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  <AlertTriangle className="w-5 h-5" />
+                  <span>❌ Annuler</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Action principale: Terminer */}
+            <div className="border-t pt-6">
+              <button
+                onClick={() => handleOpenSubModal('terminate')}
+                disabled={isSubmitting}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                <StopCircle className="w-5 h-5" />
+                <span>🏁 Terminer la session</span>
+              </button>
+            </div>
+
+            {/* Erreur générale */}
+            {errors.submit && (
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-sm text-red-600 dark:text-red-400">❌ {errors.submit}</p>
+              </div>
             )}
+
+            <div className="flex justify-end pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
           </div>
         </div>
       </div>

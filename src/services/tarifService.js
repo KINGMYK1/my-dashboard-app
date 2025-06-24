@@ -6,7 +6,7 @@ class TarifService {
   /**
    * Calculer le prix d'une session en temps réel
    */
-  static calculerPrixSession(typePoste, dureeMinutes, options = {}) {
+  static calculerCoutSession (typePoste, dureeMinutes, options = {}) {
     if (!typePoste || !dureeMinutes || dureeMinutes <= 0) {
       return {
         prix: 0,

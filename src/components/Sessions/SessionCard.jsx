@@ -1,219 +1,376 @@
-import React from 'react';
-import { Play, Pause, Square, Clock, User, Monitor, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Play, Pause, Square, Clock, User, Monitor, 
+  DollarSign, MoreVertical, AlertTriangle,
+  CreditCard, Receipt, Edit, Trash2
+} from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import SessionTimer from './SessionTimer';
-import { useSessionNotifications } from '../../hooks/useSessionNotifications';
 
 const SessionCard = ({ 
   session, 
-  onOpenActions, 
-  showTimer = true,
-  className = '' 
+  onTerminate, 
+  onPause, 
+  onResume, 
+  onCancel,
+  onExtend,
+  onPayment,
+  showActions = true,
+  compact = false,
+  sessionProgress = null // ✅ CORRECTION: Recevoir les données de progression calculées
 }) => {
   const { effectiveTheme } = useTheme();
   const { translations } = useLanguage();
   const isDarkMode = effectiveTheme === 'dark';
   
-  const { 
-    handleWarning5Min, 
-    handleWarning1Min, 
-    handleTimeExpired 
-  } = useSessionNotifications();
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
 
-  // Calculer si la session est expirée
-  const isSessionExpired = () => {
-    if (session.statut !== 'EN_COURS') return false;
-    
-    const startTime = new Date(session.dateHeureDebut);
-    const now = new Date();
-    const elapsedMs = now - startTime - (session.tempsPauseTotalMinutes || 0) * 60 * 1000;
-    const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
-    const plannedMinutes = session.dureeEstimeeMinutes || 60;
-    
-    return elapsedMinutes >= plannedMinutes;
-  };
+  // Mise à jour du temps en temps réel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
 
-  // Styles de base avec logique d'expiration
-  const expired = isSessionExpired();
-  const cardBg = isDarkMode 
-    ? `${expired ? 'bg-red-900/30 border-red-500/50' : 'bg-gray-800/90 border-gray-700/50'} hover:bg-gray-800` 
-    : `${expired ? 'bg-red-50 border-red-200' : 'bg-white/90 border-gray-200'} hover:bg-white`;
+    return () => clearInterval(interval);
+  }, []);
 
-  const textPrimary = isDarkMode ? 'text-white' : 'text-gray-900';
-  const textSecondary = isDarkMode ? 'text-gray-300' : 'text-gray-600';
-  const textMuted = isDarkMode ? 'text-gray-400' : 'text-gray-500';
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-MA', {
-      style: 'currency',
-      currency: 'MAD'
-    }).format(price || 0);
-  };
-
-  const getStatusBadge = () => {
-    const statusConfig = {
-      'EN_COURS': { 
-        color: expired 
-          ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400' 
-          : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400', 
-        label: expired ? 'Temps écoulé' : 'En cours',
-        icon: expired ? AlertTriangle : Play
-      },
-      'EN_PAUSE': { 
-        color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400', 
-        label: 'En pause',
-        icon: Pause
-      },
-      'TERMINEE': { 
-        color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400', 
-        label: 'Terminée',
-        icon: Square
-      },
-      'ANNULEE': { 
-        color: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400', 
-        label: 'Annulée',
-        icon: Square
-      }
-    };
-
-    const config = statusConfig[session.statut] || statusConfig['EN_COURS'];
-    const IconComponent = config.icon;
-    
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center space-x-1 ${config.color}`}>
-        <IconComponent size={12} />
-        <span>{config.label}</span>
-      </span>
-    );
-  };
-
-  const getActionButton = () => {
-    if (session.statut === 'EN_COURS') {
-      return (
-        <button
-          onClick={() => onOpenActions(session)}
-          className={`flex items-center space-x-1 px-3 py-1.5 rounded transition-colors text-sm ${
-            expired 
-              ? 'bg-red-600 hover:bg-red-700 text-white' 
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
-          }`}
-        >
-          <Square size={16} />
-          <span>{expired ? 'Action requise' : 'Actions'}</span>
-        </button>
-      );
+  // ✅ CORRECTION: Utiliser sessionProgress si disponible, sinon calculer manuellement
+  const calculatedProgress = useMemo(() => {
+    if (sessionProgress) {
+      return sessionProgress;
     }
+
+    // Fallback si pas de données de progression
+    if (!session.dateHeureDebut) {
+      return {
+        elapsedMinutes: 0,
+        remainingMinutes: 0,
+        progressPercent: 0,
+        isExpired: false
+      };
+    }
+
+    const debut = new Date(session.dateHeureDebut);
+    let tempsEcouleMs;
 
     if (session.statut === 'EN_PAUSE') {
-      return (
-        <button
-          onClick={() => onOpenActions(session)}
-          className="flex items-center space-x-1 px-3 py-1.5 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors text-sm"
-        >
-          <Play size={16} />
-          <span>Reprendre</span>
-        </button>
-      );
+      const pauseDebut = new Date(session.pauseActuelleDebut || currentTime);
+      tempsEcouleMs = pauseDebut.getTime() - debut.getTime();
+    } else {
+      tempsEcouleMs = currentTime.getTime() - debut.getTime();
     }
 
-    return null;
-  };
+    const tempsPauseMs = (session.tempsPauseTotalMinutes || 0) * 60 * 1000;
+    const tempsEffectifMs = Math.max(0, tempsEcouleMs - tempsPauseMs);
+
+    const totalMinutes = Math.floor(tempsEffectifMs / (1000 * 60));
+    const dureeEstimee = session.dureeEstimeeMinutes || 60;
+    const progression = dureeEstimee > 0 ? (totalMinutes / dureeEstimee) * 100 : 0;
+
+    return {
+      elapsedMinutes: totalMinutes,
+      remainingMinutes: Math.max(0, dureeEstimee - totalMinutes),
+      progressPercent: Math.min(150, progression),
+      isExpired: totalMinutes >= dureeEstimee
+    };
+  }, [sessionProgress, session, currentTime]);
+
+  // ✅ CORRECTION: Calcul du coût en temps réel avec plan tarifaire
+  const calculerCoutActuel = useMemo(() => {
+    if (session.planTarifaireUtilise) {
+      return {
+        montant: parseFloat(session.planTarifaireUtilise.prix || 0),
+        type: 'FORFAIT',
+        details: `Plan: ${session.planTarifaireUtilise.nom}`
+      };
+    } else {
+      const tarifHoraire = session.poste?.typePoste?.tarifHoraireBase || 25;
+      const montant = (calculatedProgress.elapsedMinutes / 60) * tarifHoraire;
+      
+      return {
+        montant: parseFloat(montant.toFixed(2)),
+        type: 'HORAIRE',
+        details: `${tarifHoraire} MAD/h`
+      };
+    }
+  }, [session, calculatedProgress.elapsedMinutes]);
+
+  // Déterminer l'état visuel de la session
+  const getSessionStatus = useMemo(() => {
+    if (session.statut === 'EN_PAUSE') {
+      return {
+        label: 'En Pause',
+        color: 'text-orange-600 dark:text-orange-400',
+        bgColor: 'bg-orange-100 dark:bg-orange-900/20',
+        borderColor: 'border-orange-500',
+        icon: Pause,
+        progression: Math.min(100, calculatedProgress.progressPercent)
+      };
+    }
+
+    if (calculatedProgress.isExpired) {
+      return {
+        label: 'Dépassé',
+        color: 'text-red-600 dark:text-red-400',
+        bgColor: 'bg-red-100 dark:bg-red-900/20',
+        borderColor: 'border-red-500',
+        icon: AlertTriangle,
+        progression: 100
+      };
+    }
+
+    if (calculatedProgress.progressPercent >= 80) {
+      return {
+        label: 'Fin proche',
+        color: 'text-yellow-600 dark:text-yellow-400',
+        bgColor: 'bg-yellow-100 dark:bg-yellow-900/20',
+        borderColor: 'border-yellow-500',
+        icon: Clock,
+        progression: calculatedProgress.progressPercent
+      };
+    }
+
+    return {
+      label: 'En cours',
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-100 dark:bg-green-900/20',
+      borderColor: 'border-green-500',
+      icon: Play,
+      progression: calculatedProgress.progressPercent
+    };
+  }, [session.statut, calculatedProgress]);
+
+  const status = getSessionStatus;
+
+  const cardClasses = `
+    relative p-4 rounded-lg border-2 transition-all duration-200 hover:shadow-lg
+    ${status.bgColor} ${status.borderColor}
+    ${isDarkMode ? 'bg-gray-800' : 'bg-white'}
+  `;
+
+  if (compact) {
+    return (
+      <div className={cardClasses}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <status.icon className={`w-4 h-4 ${status.color}`} />
+            <div>
+              <div className="font-medium text-sm">
+                {session.poste?.nom || 'Poste inconnu'}
+              </div>
+              <div className="text-xs text-gray-500">
+                {Math.floor(calculatedProgress.elapsedMinutes / 60)}h {calculatedProgress.elapsedMinutes % 60}m
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="font-medium text-sm">
+              {calculerCoutActuel.montant} MAD
+            </div>
+            <div className="text-xs text-gray-500">
+              {status.label}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`${cardBg} border-2 rounded-lg p-4 transition-all duration-200 hover:shadow-lg ${className} ${expired ? 'animate-pulse' : ''}`}>
-      {/* En-tête */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <Monitor className={`w-5 h-5 ${textSecondary}`} />
-          <span className={`font-semibold ${textPrimary}`}>
-            {session.poste?.nom || `Poste #${session.posteId}`}
+    <div className={cardClasses}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center space-x-3">
+          <status.icon className={`w-5 h-5 ${status.color}`} />
+          <div>
+            <h3 className="font-semibold text-lg">
+              {session.poste?.nom || 'Poste inconnu'}
+            </h3>
+            <p className="text-sm text-gray-500">
+              {session.numeroSession}
+            </p>
+          </div>
+        </div>
+        
+        {showActions && (
+          <div className="relative">
+            <button
+              onClick={() => setShowActionsMenu(!showActionsMenu)}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+            
+            {showActionsMenu && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+                <div className="py-1">
+                  {session.statut === 'EN_COURS' && (
+                    <button
+                      onClick={() => {
+                        onPause && onPause(session);
+                        setShowActionsMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    >
+                      <Pause className="w-4 h-4" />
+                      <span>Mettre en pause</span>
+                    </button>
+                  )}
+                  
+                  {session.statut === 'EN_PAUSE' && (
+                    <button
+                      onClick={() => {
+                        onResume && onResume(session);
+                        setShowActionsMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      <span>Reprendre</span>
+                    </button>
+                  )}
+                  
+                  <button
+                    onClick={() => {
+                      onTerminate && onTerminate(session);
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2"
+                  >
+                    <Square className="w-4 h-4" />
+                    <span>Terminer</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      onCancel && onCancel(session);
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center space-x-2 text-red-600"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Annuler</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Informations de la session */}
+      <div className="space-y-3 mb-4">
+        {/* Client */}
+        {session.client && !session.client.isSystemClient && (
+          <div className="flex items-center space-x-2 text-sm">
+            <User className="w-4 h-4 text-gray-400" />
+            <span>{session.client.prenom} {session.client.nom}</span>
+          </div>
+        )}
+
+        {/* Temps écoulé */}
+        <div className="flex items-center space-x-2 text-sm">
+          <Clock className="w-4 h-4 text-gray-400" />
+          <span>
+            {Math.floor(calculatedProgress.elapsedMinutes / 60)}h {calculatedProgress.elapsedMinutes % 60}m
+          </span>
+          {session.dureeEstimeeMinutes && (
+            <span className="text-gray-500">
+              / {Math.floor(session.dureeEstimeeMinutes / 60)}h {session.dureeEstimeeMinutes % 60}m
+            </span>
+          )}
+        </div>
+
+        {/* Coût actuel */}
+        <div className="flex items-center space-x-2 text-sm">
+          <DollarSign className="w-4 h-4 text-gray-400" />
+          <span className="font-medium">
+            {calculerCoutActuel.montant} MAD
+          </span>
+          <span className="text-gray-500">
+            ({calculerCoutActuel.details})
           </span>
         </div>
-        {getStatusBadge()}
-      </div>
 
-      {/* Alertes d'expiration */}
-      {expired && session.statut === 'EN_COURS' && (
-        <div className="mb-3 p-2 bg-red-600 text-white rounded-lg text-sm">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle size={16} />
-            <span className="font-medium">Temps de session dépassé</span>
-          </div>
-          <p className="text-xs mt-1 opacity-90">
-            Action requise : terminer ou prolonger la session
-          </p>
-        </div>
-      )}
-
-      {/* Informations de session */}
-      <div className="space-y-2 mb-3">
-        <div className="flex justify-between text-sm">
-          <span className={textSecondary}>Session:</span>
-          <span className={`font-mono ${textPrimary}`}>{session.numeroSession}</span>
-        </div>
-
-        {session.client && !session.client.isSystemClient && (
-          <div className="flex justify-between text-sm">
-            <span className={textSecondary}>Client:</span>
-            <span className={textPrimary}>
-              {session.client.prenom} {session.client.nom}
+        {/* Information sur le plan tarifaire utilisé */}
+        {session.planTarifaireUtilise && (
+          <div className="flex items-center space-x-2 text-sm">
+            <Receipt className="w-4 h-4 text-gray-400" />
+            <span className="text-purple-600 dark:text-purple-400">
+              Plan: {session.planTarifaireUtilise.nom}
             </span>
           </div>
         )}
 
-        {session.typeSession && (
-          <div className="flex justify-between text-sm">
-            <span className={textSecondary}>Type:</span>
-            <span className={textPrimary}>{session.typeSession}</span>
-          </div>
-        )}
-
-        {session.montantTotal > 0 && (
-          <div className="flex justify-between text-sm">
-            <span className={textSecondary}>Coût:</span>
-            <span className={`font-semibold ${textPrimary}`}>
-              {formatPrice(session.montantTotal)}
-            </span>
-          </div>
-        )}
-
+        {/* Jeu principal */}
         {session.jeuPrincipal && (
-          <div className="flex justify-between text-sm">
-            <span className={textSecondary}>Jeu:</span>
-            <span className={textPrimary}>{session.jeuPrincipal}</span>
+          <div className="flex items-center space-x-2 text-sm">
+            <Monitor className="w-4 h-4 text-gray-400" />
+            <span>{session.jeuPrincipal}</span>
           </div>
         )}
       </div>
 
-      {/* Timer de session */}
-      {showTimer && session.statut === 'EN_COURS' && (
-        <SessionTimer
-          session={session}
-          onTimeExpired={handleTimeExpired}
-          onWarning5Min={handleWarning5Min}
-          onWarning1Min={handleWarning1Min}
-          className="mb-3"
-        />
-      )}
-
-      {/* Notes */}
-      {session.notes && (
-        <div className={`text-xs ${textMuted} mb-3 italic`}>
-          "{session.notes}"
+      {/* Barre de progression */}
+      <div className="mb-4">
+        <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <span>{status.label}</span>
+          <span>{Math.round(status.progression)}%</span>
         </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex justify-between items-center">
-        <div className={`text-xs ${textMuted}`}>
-          Démarrée: {new Date(session.dateHeureDebut).toLocaleTimeString('fr-FR', {
-            hour: '2-digit',
-            minute: '2-digit'
-          })}
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full transition-all duration-300 ${
+              status.progression >= 100 ? 'bg-red-500' :
+              status.progression >= 80 ? 'bg-yellow-500' :
+              'bg-green-500'
+            }`}
+            style={{ width: `${Math.min(100, status.progression)}%` }}
+          />
         </div>
-        {getActionButton()}
       </div>
+
+      {/* Actions rapides */}
+      {showActions && (
+        <div className="flex space-x-2">
+          {session.statut === 'EN_COURS' && (
+            <button
+              onClick={() => onPause && onPause(session)}
+              className="flex-1 flex items-center justify-center px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+            >
+              <Pause className="w-4 h-4 mr-1" />
+              Pause
+            </button>
+          )}
+          
+          {session.statut === 'EN_PAUSE' && (
+            <button
+              onClick={() => onResume && onResume(session)}
+              className="flex-1 flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Play className="w-4 h-4 mr-1" />
+              Reprendre
+            </button>
+          )}
+          
+          <button
+            onClick={() => onTerminate && onTerminate(session)}
+            className="flex-1 flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Square className="w-4 h-4 mr-1" />
+            Terminer
+          </button>
+        </div>
+      )}
+
+      {/* Indicateur de pause si la session est en pause */}
+      {session.statut === 'EN_PAUSE' && session.pauseActuelleDebut && (
+        <div className="mt-3 p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+          <div className="text-xs text-orange-800 dark:text-orange-400">
+            En pause depuis {Math.floor((currentTime - new Date(session.pauseActuelleDebut)) / (1000 * 60))} minute(s)
+          </div>
+        </div>
+      )}
     </div>
   );
 };

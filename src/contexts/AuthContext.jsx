@@ -307,7 +307,7 @@ export const AuthProvider = ({ children }) => {
 
   // Fonction de vérification de permission
   const hasPermission = useCallback((permission) => {
-    console.group(`🔐 [AUTH] Vérification permission: ${permission}`);
+    // console.group(`🔐 [AUTH] Vérification permission: ${permission}`);
     
     if (!user) {
       console.log('❌ Aucun utilisateur connecté');
@@ -327,14 +327,14 @@ export const AuthProvider = ({ children }) => {
       return false;
     }
 
-    console.log('👤 Utilisateur:', user.username);
-    console.log('🎭 Rôle:', user.role.name);
-    console.log('📜 Permissions disponibles:', user.role.permissions);
+    // console.log('👤 Utilisateur:', user.username);
+    // console.log('🎭 Rôle:', user.role.name);
+    // console.log('📜 Permissions disponibles:', user.role.permissions);
 
     // Vérifier si c'est un admin (accès total)
     const isAdmin = user.role.permissions.includes('ADMIN');
     if (isAdmin) {
-      console.log('✅ Accès ADMIN - Permission accordée');
+      // console.log('✅ Accès ADMIN - Permission accordée');
       console.groupEnd();
       return true;
     }

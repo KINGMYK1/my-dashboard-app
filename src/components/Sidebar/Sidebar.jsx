@@ -100,7 +100,7 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
       path: '/dashboard/clients',
       permission: 'CUSTOMERS_VIEW' 
     },
-    // ✅ NOUVEAU : Menu Abonnements avec sous-menu
+    // ✅ CORRECTION: Menu Abonnements avec les bonnes routes
     {
       icon: <CreditCard size={20} />,
       label: translations.subscriptions || 'Abonnements',
@@ -120,6 +120,35 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
           label: translations.clientSubscriptions || 'Abonnements Clients',
           path: '/dashboard/abonnements',
           permission: 'ABONNEMENTS_VIEW'
+        }
+      ]
+    },
+    // ✅ NOUVEAU: Menu Analyses avec sous-menu
+    {
+      icon: <BarChart3 size={20} />,
+      label: translations.analytics || 'Analyses',
+      path: '/dashboard/statistiques',
+      permission: 'SESSIONS_VIEW',
+      hasSubmenu: true,
+      submenuKey: 'analytics',
+      children: [
+        {
+          icon: <Monitor size={18} />,
+          label: translations.dashboardPostes || 'Dashboard Postes',
+          path: '/dashboard/dashboard-postes',
+          permission: 'SESSIONS_VIEW'
+        },
+        {
+          icon: <BarChart3 size={18} />,
+          label: translations.detailedStatistics || 'Statistiques Détaillées',
+          path: '/dashboard/statistiques',
+          permission: 'SESSIONS_VIEW'
+        },
+        {
+          icon: <Calendar size={18} />,
+          label: translations.sessionHistory || 'Historique Sessions',
+          path: '/dashboard/historique-sessions',
+          permission: 'SESSIONS_VIEW'
         }
       ]
     },
@@ -204,17 +233,27 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     }] : [])
   ];
 
+  // ✅ CORRECTION: Correction du handleNavigation pour forcer la navigation
   const handleNavigation = (e, path) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('🎯 [SIDEBAR] Navigation vers:', path);
     
     // Fermer le sidebar sur mobile après navigation
     if (isMobile && expanded) {
       toggleSidebar();
     }
     
-    navigate(path);
+    // ✅ CORRECTION: Forcer la navigation même si on est déjà sur une route similaire
+    if (location.pathname !== path) {
+      navigate(path, { replace: false });
+    } else {
+      // Si on est déjà sur la route, forcer un refresh du composant
+      navigate(path, { replace: true });
+    }
   };
-  
+
   const handleLogout = async (e) => {
     e.preventDefault();
     try {

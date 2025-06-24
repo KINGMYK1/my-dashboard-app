@@ -1,28 +1,121 @@
-import React from 'react';
-import { Search, Filter, Calendar, User, Monitor, Clock, Euro, Eye, XCircle, Pause, Play } from 'lucide-react';
-import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner'; // Assuming this component exists
+import React, { useState, useMemo } from 'react';
+import { 
+  Search, Filter, Download, Eye, Receipt, Wrench, 
+  Calendar, Clock, User, Monitor, DollarSign,
+  ChevronLeft, ChevronRight, ArrowUpDown
+} from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { useHistoriqueSessions } from '../../hooks/useSessions';
+import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 
-const SessionsHistoriqueTab = ({
-  sessions,
-  loading,
-  filters,
-  setFilters,
-  pagination,
-  onPageChange,
-  getTextColorClass,
-  getBgColorClass,
-  getBorderColorClass,
-  getEtatColor, // Function to get status color based on status string
-  getEtatIcon,  // Function to get status icon based on status string
-  translations, // Translations object
-  allPostes, // List of all postes for filtering
-  allClients // List of all clients for filtering
-}) => {
-  // Helper to format date and time
+const SessionsHistoriqueTab = () => {
+  const { effectiveTheme } = useTheme();
+  const { translations } = useLanguage();
+  const isDarkMode = effectiveTheme === 'dark';
+
+  const [filters, setFilters] = useState({
+    page: 1,
+    limit: 20,
+    dateDebut: '',
+    dateFin: '',
+    etats: [],
+    search: '',
+    sortBy: 'dateHeureDebut',
+    sortOrder: 'desc'
+  });
+
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  // ✅ CORRECTION: Utilisation du hook avec filtres
+  const { 
+    data: sessionsData, 
+    isLoading, 
+    error,
+    refetch 
+  } = useHistoriqueSessions(filters);
+
+  // ✅ CORRECTION: Fonctions helper pour les classes CSS
+  const getTextColorClass = (isPrimary = false) => {
+    return isDarkMode
+      ? (isPrimary ? 'text-white' : 'text-gray-300')
+      : (isPrimary ? 'text-gray-900' : 'text-gray-600');
+  };
+
+  const getBgColorClass = () => {
+    return isDarkMode ? 'bg-gray-800' : 'bg-white';
+  };
+
+  const getBorderColorClass = () => {
+    return isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  };
+
+  const getCardHoverClass = () => {
+    return isDarkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50';
+  };
+
+  // ✅ CORRECTION: Extraction des données avec vérification
+  const sessions = useMemo(() => {
+    if (!sessionsData?.sessions) return [];
+    return Array.isArray(sessionsData.sessions) ? sessionsData.sessions : [];
+  }, [sessionsData]);
+
+  const pagination = useMemo(() => {
+    return sessionsData?.pagination || {
+      page: 1,
+      limit: 20,
+      total: 0,
+      totalPages: 1
+    };
+  }, [sessionsData]);
+
+  // ✅ CORRECTION: Gestion des filtres
+  const handleFilterChange = (key, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value,
+      ...(key !== 'page' && { page: 1 }) // Reset page sauf si on change de page
+    }));
+  };
+
+  const handlePageChange = (page) => {
+    setFilters(prev => ({ ...prev, page }));
+  };
+
+  // ✅ CORRECTION: Reset des filtres
+  const resetFilters = () => {
+    setFilters({
+      page: 1,
+      limit: 20,
+      dateDebut: '',
+      dateFin: '',
+      etats: [],
+      search: '',
+      sortBy: 'dateHeureDebut',
+      sortOrder: 'desc'
+    });
+  };
+
+  // ✅ CORRECTION: Fonctions de formatage
+  const formatDuration = (minutes) => {
+    if (!minutes || minutes === 0) return '0 min';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${mins > 0 ? `${mins}min` : ''}`.trim();
+    }
+    return `${mins} min`;
+  };
+
+  const formatCurrency = (amount) => {
+    if (amount === null || amount === undefined || isNaN(amount)) return '0,00 MAD';
+    return `${parseFloat(amount).toFixed(2)} MAD`;
+  };
+
   const formatDate = (dateString) => {
-    if (!dateString) return translations?.notApplicable || 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
+    return new Date(dateString).toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -31,304 +124,403 @@ const SessionsHistoriqueTab = ({
     });
   };
 
-  // Helper to format duration from start to end, considering pauses
-  const formatDuration = (debut, fin, tempsPause = 0) => {
-    if (!fin) return translations?.inProgress || 'En cours';
+  // ✅ CORRECTION: Badge d'état de session
+  const getSessionStatusBadge = (statut) => {
+    const statusConfig = {
+      'EN_COURS': { 
+        color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400', 
+        label: 'En cours' 
+      },
+      'TERMINEE': { 
+        color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400', 
+        label: 'Terminée' 
+      },
+      'ANNULEE': { 
+        color: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400', 
+        label: 'Annulée' 
+      },
+      'EN_PAUSE': { 
+        color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400', 
+        label: 'En pause' 
+      }
+    };
 
-    const start = new Date(debut);
-    const end = new Date(fin);
-    let diffMinutes = Math.floor((end - start) / (1000 * 60)); // Total minutes
+    const config = statusConfig[statut] || statusConfig['TERMINEE'];
     
-    // Subtract pause time if recorded (assuming tempsPause is in hours for consistency with backend hook)
-    const pauseMinutes = parseFloat(tempsPause || 0) * 60;
-    diffMinutes = Math.max(0, diffMinutes - pauseMinutes);
-
-    const hours = Math.floor(diffMinutes / 60);
-    const minutes = diffMinutes % 60;
-    return `${hours}h ${minutes}m`;
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+        {config.label}
+      </span>
+    );
   };
 
-  // Helper to format price
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'MAD' }).format(price || 0);
-  };
+  // ✅ CORRECTION: Badge de paiement
+  const getPaymentStatusBadge = (session) => {
+    const montantTotal = parseFloat(session.montantTotal) || 0;
+    const montantPaye = parseFloat(session.montantPaye) || 0;
+    const resteAPayer = Math.max(0, montantTotal - montantPaye);
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value, page: 1 })); // Reset to first page on filter change
-  };
-
-  // Get status color and icon for session status
-  const getSessionStatusDisplay = (status) => {
-    let colorClass = '';
-    let icon = null;
-    let label = '';
-
-    switch (status) {
-      case 'EN_COURS':
-        colorClass = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-        icon = <Play className="w-4 h-4" />;
-        label = translations?.inProgress || 'En cours';
-        break;
-      case 'TERMINEE':
-        colorClass = 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-        icon = <CheckCircle className="w-4 h-4" />;
-        label = translations?.finished || 'Terminée';
-        break;
-      case 'ANNULEE':
-        colorClass = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-        icon = <XCircle className="w-4 h-4" />;
-        label = translations?.cancelled || 'Annulée';
-        break;
-      case 'EN_PAUSE':
-        colorClass = 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-        icon = <Pause className="w-4 h-4" />;
-        label = translations?.paused || 'En pause';
-        break;
-      default:
-        colorClass = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-        icon = <Eye className="w-4 h-4" />;
-        label = translations?.unknown || 'Inconnu';
+    if (resteAPayer <= 0.01) {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+          Payée
+        </span>
+      );
+    } else if (montantPaye > 0) {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400">
+          Partiel
+        </span>
+      );
+    } else {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
+          Non payée
+        </span>
+      );
     }
-    return { colorClass, icon, label };
   };
+
+  // ✅ CORRECTION: Export des données
+  const handleExport = () => {
+    console.log('🎯 [HISTORIQUE] Export des sessions:', sessions);
+    // TODO: Implémenter l'export CSV/Excel
+  };
+
+  // ✅ CORRECTION: Affichage du chargement
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner />
+        <span className="ml-2">Chargement de l'historique...</span>
+      </div>
+    );
+  }
+
+  // ✅ CORRECTION: Affichage des erreurs
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-600 mb-4">Erreur lors du chargement: {error.message}</p>
+        <button
+          onClick={() => refetch()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-4">
-      {/* Filters and Search */}
-      <div className={`mb-6 p-4 rounded-lg border ${getBorderColorClass()} ${getBgColorClass()}`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Search Term */}
-          <div>
-            <label htmlFor="search" className={`block text-sm font-medium mb-1 ${getTextColorClass(false)}`}>
-              <Search size={16} className="inline-block mr-1" /> {translations?.search || 'Rechercher'}
-            </label>
-            <input
-              type="text"
-              id="search"
-              name="search"
-              value={filters.search || ''}
-              onChange={handleFilterChange}
-              className={`w-full px-3 py-2 border rounded-lg ${getBorderColorClass()} ${getBgColorClass()} ${getTextColorClass(true)} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-              placeholder={translations?.searchBySessionNumberClientPoste || 'N° session, client, poste...'}
-            />
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label htmlFor="statut" className={`block text-sm font-medium mb-1 ${getTextColorClass(false)}`}>
-              <Filter size={16} className="inline-block mr-1" /> {translations?.status || 'Statut'}
-            </label>
-            <select
-              id="statut"
-              name="statut"
-              value={filters.statut || ''}
-              onChange={handleFilterChange}
-              className={`w-full px-3 py-2 border rounded-lg ${getBorderColorClass()} ${getBgColorClass()} ${getTextColorClass(true)} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            >
-              <option value="">{translations?.all || 'Tous'}</option>
-              <option value="EN_COURS">{translations?.inProgress || 'En cours'}</option>
-              <option value="TERMINEE">{translations?.finished || 'Terminée'}</option>
-              <option value="ANNULEE">{translations?.cancelled || 'Annulée'}</option>
-              <option value="EN_PAUSE">{translations?.paused || 'En pause'}</option>
-            </select>
-          </div>
-
-          {/* Poste Filter */}
-          <div>
-            <label htmlFor="posteId" className={`block text-sm font-medium mb-1 ${getTextColorClass(false)}`}>
-              <Monitor size={16} className="inline-block mr-1" /> {translations?.poste || 'Poste'}
-            </label>
-            <select
-              id="posteId"
-              name="posteId"
-              value={filters.posteId || ''}
-              onChange={handleFilterChange}
-              className={`w-full px-3 py-2 border rounded-lg ${getBorderColorClass()} ${getBgColorClass()} ${getTextColorClass(true)} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            >
-              <option value="">{translations?.all || 'Tous'}</option>
-              {allPostes?.map(poste => (
-                <option key={poste.id} value={poste.id}>{poste.nom}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Client Filter */}
-          <div>
-            <label htmlFor="clientId" className={`block text-sm font-medium mb-1 ${getTextColorClass(false)}`}>
-              <User size={16} className="inline-block mr-1" /> {translations?.client || 'Client'}
-            </label>
-            <select
-              id="clientId"
-              name="clientId"
-              value={filters.clientId || ''}
-              onChange={handleFilterChange}
-              className={`w-full px-3 py-2 border rounded-lg ${getBorderColorClass()} ${getBgColorClass()} ${getTextColorClass(true)} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            >
-              <option value="">{translations?.all || 'Tous'}</option>
-              {allClients?.map(client => (
-                <option key={client.id} value={client.id}>{client.prenom} {client.nom} ({client.numeroClient})</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Date Range (Optional) */}
-          <div>
-            <label htmlFor="dateDebut" className={`block text-sm font-medium mb-1 ${getTextColorClass(false)}`}>
-              <Calendar size={16} className="inline-block mr-1" /> {translations?.startDate || 'Date de début'}
-            </label>
-            <input
-              type="date"
-              id="dateDebut"
-              name="dateDebut"
-              value={filters.dateDebut || ''}
-              onChange={handleFilterChange}
-              className={`w-full px-3 py-2 border rounded-lg ${getBorderColorClass()} ${getBgColorClass()} ${getTextColorClass(true)} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-          </div>
-          <div>
-            <label htmlFor="dateFin" className={`block text-sm font-medium mb-1 ${getTextColorClass(false)}`}>
-              <Calendar size={16} className="inline-block mr-1" /> {translations?.endDate || 'Date de fin'}
-            </label>
-            <input
-              type="date"
-              id="dateFin"
-              name="dateFin"
-              value={filters.dateFin || ''}
-              onChange={handleFilterChange}
-              className={`w-full px-3 py-2 border rounded-lg ${getBorderColorClass()} ${getBgColorClass()} ${getTextColorClass(true)} focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            />
-          </div>
+    <div className="space-y-6">
+      {/* ✅ CORRECTION: En-tête */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className={`text-2xl font-bold ${getTextColorClass(true)}`}>
+            Historique des Sessions
+          </h2>
+          <p className={`${getTextColorClass(false)} mt-1`}>
+            {pagination.total} session(s) trouvée(s)
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={handleExport}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Download size={16} />
+            <span>Exporter</span>
+          </button>
+          <button
+            onClick={resetFilters}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Réinitialiser
+          </button>
         </div>
       </div>
 
-      {loading ? (
-        <LoadingSpinner text={translations?.loadingSessions || "Chargement des sessions..."} />
-      ) : sessions.length === 0 ? (
-        <div className={`text-center py-12 ${getTextColorClass(false)}`}>
-          <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-lg">
-            {translations?.noSessionsFound || 'Aucune session trouvée avec ces filtres.'}
-          </p>
+      {/* ✅ CORRECTION: Filtres */}
+      <div className={`p-4 rounded-lg border ${getBgColorClass()} ${getBorderColorClass()}`}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher (poste, client...)"
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+              className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
+                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+              }`}
+            />
+          </div>
+
+          {/* État des sessions */}
+          <select
+            value={filters.etats.join(',')}
+            onChange={(e) => handleFilterChange('etats', e.target.value ? e.target.value.split(',') : [])}
+            className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+              isDarkMode 
+                ? 'bg-gray-700 border-gray-600 text-white' 
+                : 'bg-white border-gray-300 text-gray-900'
+            }`}
+          >
+            <option value="">Tous les états</option>
+            <option value="EN_COURS">En cours</option>
+            <option value="TERMINEE">Terminées</option>
+            <option value="ANNULEE">Annulées</option>
+            <option value="EN_PAUSE">En pause</option>
+          </select>
+
+          {/* Date de début */}
+          <input
+            type="date"
+            placeholder="Date de début"
+            value={filters.dateDebut}
+            onChange={(e) => handleFilterChange('dateDebut', e.target.value)}
+            className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+              isDarkMode 
+                ? 'bg-gray-700 border-gray-600 text-white' 
+                : 'bg-white border-gray-300 text-gray-900'
+            }`}
+          />
+
+          {/* Date de fin */}
+          <input
+            type="date"
+            placeholder="Date de fin"
+            value={filters.dateFin}
+            onChange={(e) => handleFilterChange('dateFin', e.target.value)}
+            className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+              isDarkMode 
+                ? 'bg-gray-700 border-gray-600 text-white' 
+                : 'bg-white border-gray-300 text-gray-900'
+            }`}
+          />
         </div>
-      ) : (
-        <div className="space-y-4">
-          {sessions.map(session => {
-            const { colorClass, icon: statusIcon, label: statusLabel } = getSessionStatusDisplay(session.statut);
-            return (
-              <div
-                key={session.id}
-                className={`p-5 rounded-lg border ${getBorderColorClass()} shadow-md ${getBgColorClass()} transition-all duration-300 hover:shadow-lg`}
+
+        {/* ✅ Tri */}
+        <div className="flex items-center space-x-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <span className={`text-sm ${getTextColorClass(false)}`}>Trier par:</span>
+          <select
+            value={filters.sortBy}
+            onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+            className={`px-3 py-1 border rounded ${
+              isDarkMode 
+                ? 'bg-gray-700 border-gray-600 text-white' 
+                : 'bg-white border-gray-300 text-gray-900'
+            }`}
+          >
+            <option value="dateHeureDebut">Date de début</option>
+            <option value="dureeReelleMinutes">Durée</option>
+            <option value="montantTotal">Coût</option>
+          </select>
+          <select
+            value={filters.sortOrder}
+            onChange={(e) => handleFilterChange('sortOrder', e.target.value)}
+            className={`px-3 py-1 border rounded ${
+              isDarkMode 
+                ? 'bg-gray-700 border-gray-600 text-white' 
+                : 'bg-white border-gray-300 text-gray-900'
+            }`}
+          >
+            <option value="desc">Décroissant</option>
+            <option value="asc">Croissant</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ✅ CORRECTION: Tableau des sessions */}
+      <div className={`rounded-lg border ${getBgColorClass()} ${getBorderColorClass()}`}>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
+              <tr>
+                <th className={`px-6 py-3 text-left text-xs font-medium ${getTextColorClass(false)} uppercase tracking-wider`}>
+                  Session
+                </th>
+                <th className={`px-6 py-3 text-left text-xs font-medium ${getTextColorClass(false)} uppercase tracking-wider`}>
+                  Client
+                </th>
+                <th className={`px-6 py-3 text-left text-xs font-medium ${getTextColorClass(false)} uppercase tracking-wider`}>
+                  Durée
+                </th>
+                <th className={`px-6 py-3 text-left text-xs font-medium ${getTextColorClass(false)} uppercase tracking-wider`}>
+                  État
+                </th>
+                <th className={`px-6 py-3 text-left text-xs font-medium ${getTextColorClass(false)} uppercase tracking-wider`}>
+                  Montants
+                </th>
+                <th className={`px-6 py-3 text-left text-xs font-medium ${getTextColorClass(false)} uppercase tracking-wider`}>
+                  Paiement
+                </th>
+                <th className={`px-6 py-3 text-right text-xs font-medium ${getTextColorClass(false)} uppercase tracking-wider`}>
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className={`${getBgColorClass()} divide-y divide-gray-200 dark:divide-gray-700`}>
+              {sessions.map((session) => {
+                const montantTotal = parseFloat(session.montantTotal) || 0;
+                const montantPaye = parseFloat(session.montantPaye) || 0;
+                const resteAPayer = Math.max(0, montantTotal - montantPaye);
+
+                return (
+                  <tr key={session.id} className={getCardHoverClass()}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className={`text-sm font-medium ${getTextColorClass(true)}`}>
+                          {session.poste?.nom || 'Poste inconnu'}
+                        </div>
+                        <div className={`text-sm ${getTextColorClass(false)}`}>
+                          {formatDate(session.dateHeureDebut)}
+                        </div>
+                        <div className={`text-xs ${getTextColorClass(false)}`}>
+                          #{session.numeroSession || session.id}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className={`text-sm ${getTextColorClass(true)}`}>
+                        {session.client ? 
+                          `${session.client.prenom} ${session.client.nom}` : 
+                          'Client anonyme'
+                        }
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className={`text-sm ${getTextColorClass(true)}`}>
+                        {formatDuration(session.dureeReelleMinutes || session.dureeEffectiveMinutes)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getSessionStatusBadge(session.statut)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="space-y-1">
+                        <div className={`text-sm font-medium ${getTextColorClass(true)}`}>
+                          Total: {formatCurrency(montantTotal)}
+                        </div>
+                        <div className="text-xs text-green-600 dark:text-green-400">
+                          Payé: {formatCurrency(montantPaye)}
+                        </div>
+                        {resteAPayer > 0 && (
+                          <div className="text-xs text-red-600 dark:text-red-400">
+                            Reste: {formatCurrency(resteAPayer)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getPaymentStatusBadge(session)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                      <button
+                        onClick={() => {
+                          setSelectedSession(session);
+                          setShowDetailsModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 p-1"
+                        title="Voir les détails"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button
+                        className="text-green-600 hover:text-green-800 p-1"
+                        title="Générer reçu"
+                      >
+                        <Receipt size={16} />
+                      </button>
+                      <button
+                        className="text-orange-600 hover:text-orange-800 p-1"
+                        title="Corriger session"
+                      >
+                        <Wrench size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* ✅ CORRECTION: Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className={`px-6 py-4 border-t ${getBorderColorClass()} flex items-center justify-between`}>
+            <div className={`text-sm ${getTextColorClass(false)}`}>
+              Affichage de {((pagination.page - 1) * pagination.limit) + 1} à {Math.min(pagination.page * pagination.limit, pagination.total)} sur {pagination.total} résultats
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+                className={`px-3 py-1 rounded ${
+                  pagination.page <= 1 
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
-                {/* Header */}
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className={`font-bold ${getTextColorClass(true)} text-lg flex items-center`}>
-                    <Monitor size={18} className="mr-2" />
-                    {session.poste?.nom || session.Poste?.nom || translations?.unknownPoste || 'Poste inconnu'}
-                    <span className={`ml-3 px-2 py-0.5 rounded-full text-xs font-semibold flex items-center ${colorClass}`}>
-                      {statusIcon}
-                      <span className="ml-1">{statusLabel}</span>
-                    </span>
-                  </h3>
-                  <span className={`text-sm ${getTextColorClass(false)}`}>
-                    {translations?.sessionNumber || 'N° Session'}: {session.numeroSession}
-                  </span>
-                </div>
+                <ChevronLeft size={16} />
+              </button>
+              <span className={`px-3 py-1 ${getTextColorClass(true)}`}>
+                {pagination.page} / {pagination.totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page >= pagination.totalPages}
+                className={`px-3 py-1 rounded ${
+                  pagination.page >= pagination.totalPages 
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
-                {/* Client Info */}
-                <div className="flex items-center space-x-2 mb-2">
-                  <User size={16} className={`${getTextColorClass(false)}`} />
-                  <p className={`text-base ${getTextColorClass(true)}`}>
-                    {session.client?.prenom} {session.client?.nom} ({session.clientId === 1 ? (translations?.anonymous || 'Anonyme') : session.client?.numeroClient})
-                  </p>
-                </div>
-
-                {/* Dates & Duration */}
-                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                  <div>
-                    <div className={`font-semibold ${getTextColorClass(false)}`}>{translations?.startTime || 'Début'}</div>
-                    <div className={`${getTextColorClass(true)}`}>{formatDate(session.dateHeureDebut)}</div>
-                  </div>
-                  <div>
-                    <div className={`font-semibold ${getTextColorClass(false)}`}>{translations?.endTime || 'Fin'}</div>
-                    <div className={`${getTextColorClass(true)}`}>
-                      {session.dateHeureFin ? formatDate(session.dateHeureFin) : translations?.inProgress || 'En cours'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className={`font-semibold ${getTextColorClass(false)}`}>{translations?.estimatedDuration || 'Durée estimée'}</div>
-                    <div className={`${getTextColorClass(true)}`}>{session.dureeEstimee} {translations?.hoursShort || 'h'}</div>
-                  </div>
-                  <div>
-                    <div className={`font-semibold ${getTextColorClass(false)}`}>{translations?.effectiveDuration || 'Durée effective'}</div>
-                    <div className={`${getTextColorClass(true)}`}>
-                      {formatDuration(session.dateHeureDebut, session.dateHeureFin, session.tempsPause)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Amount */}
-                <div className="flex justify-between items-center pt-3 border-t border-dashed border-gray-300 dark:border-gray-700">
-                  <div className={`font-semibold ${getTextColorClass(false)} flex items-center`}>
-                    <Euro size={18} className="mr-1" />
-                    {translations?.finalAmount || 'Montant final'}
-                  </div>
-                  <div className={`font-bold text-xl ${getTextColorClass(true)}`}>
-                    {formatPrice(session.montantFinal)}
-                  </div>
-                </div>
-
-                {/* Additional Info (Game, Notes, Payment, Subscription) */}
-                {(session.jeuPrincipal || session.notes || session.modePaiement || session.abonnement) && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-1 text-sm">
-                    {session.jeuPrincipal && (
-                      <p className={`${getTextColorClass(false)}`}>
-                        <strong>{translations?.game || 'Jeu'}:</strong> {session.jeuPrincipal}
-                      </p>
-                    )}
-                    {session.modePaiement && (
-                      <p className={`${getTextColorClass(false)}`}>
-                        <strong>{translations?.paymentMode || 'Mode de paiement'}:</strong> {translations?.[session.modePaiement.toLowerCase()] || session.modePaiement}
-                      </p>
-                    )}
-                    {session.abonnement && (
-                      <p className={`${getTextColorClass(false)}`}>
-                        <strong>{translations?.subscription || 'Abonnement'}:</strong> {session.abonnement.numeroAbonnement} ({session.abonnement.typeAbonnement?.nom})
-                      </p>
-                    )}
-                    {session.notes && (
-                      <p className={`${getTextColorClass(false)}`}>
-                        <strong>{translations?.notes || 'Notes'}:</strong> {session.notes}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      {/* ✅ Message si aucune session */}
+      {sessions.length === 0 && !isLoading && (
+        <div className={`text-center py-8 ${getTextColorClass()}`}>
+          <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <p className="text-lg font-medium mb-2">Aucune session trouvée</p>
+          <p className="text-sm text-gray-500">
+            Essayez de modifier vos filtres ou critères de recherche
+          </p>
         </div>
       )}
 
-      {/* Pagination Controls */}
-      {pagination && pagination.total > 0 && (
-        <div className={`flex justify-center items-center space-x-4 mt-6 p-4 rounded-lg border ${getBorderColorClass()} ${getBgColorClass()}`}>
-          <button
-            onClick={() => onPageChange(pagination.page - 1)}
-            disabled={pagination.page <= 1}
-            className={`px-4 py-2 text-sm border ${getBorderColorClass()} rounded-lg ${getBgColorClass()} ${getTextColorClass(false)} hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
-          >
-            {translations?.previous || 'Précédent'}
-          </button>
-          <span className={`${getTextColorClass(true)} text-lg font-semibold`}>
-            {pagination.page} / {pagination.pages}
-          </span>
-          <button
-            onClick={() => onPageChange(pagination.page + 1)}
-            disabled={pagination.page >= pagination.pages}
-            className={`px-4 py-2 text-sm border ${getBorderColorClass()} rounded-lg ${getBgColorClass()} ${getTextColorClass(false)} hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
-          >
-            {translations?.next || 'Suivant'}
-          </button>
+      {/* ✅ TODO: Modal de détails (à implémenter) */}
+      {showDetailsModal && selectedSession && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className={`max-w-2xl w-full mx-4 p-6 rounded-lg ${getBgColorClass()}`}>
+            <h3 className={`text-lg font-semibold mb-4 ${getTextColorClass(true)}`}>
+              Détails de la session #{selectedSession.numeroSession || selectedSession.id}
+            </h3>
+            {/* Contenu des détails */}
+            <div className="space-y-4">
+              <p>Poste: {selectedSession.poste?.nom}</p>
+              <p>Date: {formatDate(selectedSession.dateHeureDebut)}</p>
+              <p>Durée: {formatDuration(selectedSession.dureeReelleMinutes)}</p>
+              <p>Montant: {formatCurrency(selectedSession.montantTotal)}</p>
+            </div>
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

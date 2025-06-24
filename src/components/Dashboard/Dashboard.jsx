@@ -5,23 +5,29 @@ import { useTheme } from '../../contexts/ThemeContext';
 import Header from '../Header/Header';
 import Sidebar from '../Sidebar/Sidebar';
 
-// Pages du dashboard
+// ✅ CORRECTION: Imports manquants - ajouter tous les composants de pages
 import Home from '../../pages/Home/Home';
 import Users from '../../pages/Users/Users';
 import Roles from '../../pages/Roles/Roles';
 import Permissions from '../../pages/Permissions/Permissions';
 import Postes from '../../pages/Postes/Postes';
-import TypesPostes from '../../pages/Postes/TypesPostes'; // ✅ AJOUT
-import Settings from '../../pages/Settings/Settings';
+import TypesPostes from '../../pages/Postes/TypesPostes';
 import Monitoring from '../../pages/Monitoring/Monitoring';
+import Settings from '../../pages/Settings/Settings';
 import Notifications from '../../pages/Notifications/Notifications';
-
-
 import Clients from '../../pages/Clients/Clients';
+import Sessions from '../../pages/Sessions/Sessions'; // ✅ AJOUT important
 import TypesAbonnements from '../../pages/TypesAbonnements/TypesAbonnements';
 import Abonnements from '../../pages/Abonnements/Abonnements';
-// import Sessions from '../../pages/Sessions/Sessions';
-import Sessions from '../../pages/Sessions/Sessions'; // ✅ AJOUT
+import HistoriqueSessions from '../../pages/Sessions/HistoriqueSessions';
+// import TransactionsPage from '../../pages/Transactions/Transactions';
+
+// ✅ AJOUT: Composants manquants (créer si nécessaire)
+import Ventes from '../../pages/Ventes/Ventes';
+import Inventaire from '../../pages/Inventaire/Inventaire';
+import Evenements from '../../pages/Evenements/Evenements';
+
+// import Sidebar from '../Sidebar/Sidebar';
 
 const Dashboard = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
@@ -167,40 +173,55 @@ const Dashboard = () => {
                 hasPermission('PERMISSIONS_VIEW') ? <Permissions /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* ✅ CORRECTION: Routes postes complètes */}
               <Route path="/postes" element={
                 hasPermission('POSTES_VIEW') ? <Postes /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* ✅ AJOUT: Route pour les types de postes */}
               <Route path="/postes/types" element={
                 hasPermission('POSTES_MANAGE') ? <TypesPostes /> : <Navigate to="/dashboard" replace />
               } />
-              
+              {/* <Route path="/transactions" element={
+                hasPermission('POSTES_MANAGE') ? <TransactionsPage /> : <Navigate to="/dashboard" replace />
+              } />
+               */}
               <Route path="/monitoring" element={
                 hasPermission('MONITORING_VIEW') ? <Monitoring /> : <Navigate to="/dashboard" replace />
               } />
 
-                <Route path="/types-abonnements" element={
-                  hasPermission('ABONNEMENTS_MANAGE') ? <TypesAbonnements /> : <Navigate to="/dashboard" replace />
-                } />
-                 <Route path="/sessions" element={
-                hasPermission('SESSIONS_VIEW') ? <Sessions /> : <Navigate to="/dashboard" replace />
-              } />
-                {/* ✅ AJOUT: Nouvelles routes Gaming Center */}
-               <Route path="/clients" element={
+              <Route path="/clients" element={
                 hasPermission('CLIENTS_VIEW') ? <Clients /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/*
-              */}
-              {/* <Route path="/sessions" element={
+              {/* ✅ CORRECTION: Route Sessions décommentée et corrigée */}
+              <Route path="/sessions" element={
                 hasPermission('SESSIONS_VIEW') ? <Sessions /> : <Navigate to="/dashboard" replace />
-              } /> */}
+              } />
+              
+              <Route path="/types-abonnements" element={
+                hasPermission('ABONNEMENTS_MANAGE') ? <TypesAbonnements /> : <Navigate to="/dashboard" replace />
+              } />
               
               <Route path="/abonnements" element={
                 hasPermission('ABONNEMENTS_VIEW') ? <Abonnements /> : <Navigate to="/dashboard" replace />
               } />
+              
+              {/* ✅ AJOUT: Nouvelles routes (créer les composants si nécessaire) */}
+              
+              <Route path="/ventes" element={
+                hasPermission('SALES_VIEW') ? <Ventes /> : <Navigate to="/dashboard" replace />
+              } />
+              <Route path="/historique-sessions" element={
+                hasPermission('SALES_VIEW') ? <HistoriqueSessions /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/inventaire" element={
+                hasPermission('INVENTORY_VIEW') ? <Inventaire /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/evenements" element={
+                hasPermission('EVENTS_VIEW') ? <Evenements /> : <Navigate to="/dashboard" replace />
+              } />
+             
               
               <Route path="/settings" element={<Settings />} />
               <Route path="/notifications" element={<Notifications />} />

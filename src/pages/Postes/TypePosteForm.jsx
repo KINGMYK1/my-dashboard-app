@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Plus, Trash2, Palette, Tag, DollarSign, Clock, Sparkles } from 'lucide-react';
+import { X, Save, Plus, Trash2, Palette, Tag, DollarSign, Clock, Sparkles, AlertCircle, Info } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useCreateTypePoste, useUpdateTypePoste } from '../../hooks/useTypePostes';
@@ -19,6 +19,7 @@ const TypePosteForm = ({ typePoste, onClose }) => {
   const createTypePosteMutation = useCreateTypePoste();
   const updateTypePosteMutation = useUpdateTypePoste();
 
+  // ✅ AMÉLIORÉ: État du formulaire avec nouvelles propriétés
   const [formData, setFormData] = useState({
     nom: '',
     description: '',
@@ -26,7 +27,11 @@ const TypePosteForm = ({ typePoste, onClose }) => {
     icone: '',
     couleur: '#8b5cf6',
     estActif: true,
+    dureeMinSession: 15,
+    intervalleFacturation: 15,
+    devise: 'MAD'
   });
+
   const [plansTarifaires, setPlansTarifaires] = useState([]);
   const [validationErrors, setValidationErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,13 +42,13 @@ const TypePosteForm = ({ typePoste, onClose }) => {
   // ✅ Suggestions d'icônes basées sur le nom
   const suggestedIcons = GamingIconService.getSuggestedIcons(formData.nom);
 
-  // ✅ Styles compacts et modérés
+  // Styles existants (gardés identiques)
   const styles = {
     container: `fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-center z-50 p-4`,
     modal: `relative bg-gradient-to-br ${isDarkMode 
       ? 'from-gray-900 via-gray-800 to-purple-900/10' 
       : 'from-white via-gray-50 to-purple-50/50'
-    } rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border ${isDarkMode 
+    } rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${isDarkMode 
       ? 'border-purple-500/20' 
       : 'border-purple-200'
     }`,
@@ -71,6 +76,7 @@ const TypePosteForm = ({ typePoste, onClose }) => {
     textSecondary: isDarkMode ? 'text-gray-300' : 'text-gray-600',
   };
 
+  // ✅ AMÉLIORÉ: Chargement des données avec nouvelles propriétés
   useEffect(() => {
     if (isEdit && typePoste) {
       setFormData({
@@ -80,6 +86,9 @@ const TypePosteForm = ({ typePoste, onClose }) => {
         icone: typePoste.icone || '',
         couleur: typePoste.couleur || '#8b5cf6',
         estActif: typePoste.estActif !== undefined ? typePoste.estActif : true,
+        dureeMinSession: typePoste.dureeMinSession || 15,
+        intervalleFacturation: typePoste.intervalleFacturation || 15,
+        devise: typePoste.devise || 'MAD'
       });
       setPlansTarifaires(typePoste.plansTarifaires || []);
     } else {
@@ -90,6 +99,9 @@ const TypePosteForm = ({ typePoste, onClose }) => {
         icone: '',
         couleur: '#8b5cf6',
         estActif: true,
+        dureeMinSession: 15,
+        intervalleFacturation: 15,
+        devise: 'MAD'
       });
       setPlansTarifaires([]);
     }
@@ -111,12 +123,24 @@ const TypePosteForm = ({ typePoste, onClose }) => {
     }
   };
 
+  // ✅ AMÉLIORÉ: Gestion des plans avec nouvelles propriétés
   const handlePlanChange = (index, field, value) => {
     const newPlans = [...plansTarifaires];
     newPlans[index] = {
       ...newPlans[index],
       [field]: value
     };
+
+    // ✅ Calcul automatique du tarif horaire équivalent
+    if (field === 'dureeMinutes' || field === 'prix') {
+      const duree = field === 'dureeMinutes' ? parseInt(value) : parseInt(newPlans[index].dureeMinutes);
+      const prix = field === 'prix' ? parseFloat(value) : parseFloat(newPlans[index].prix);
+      
+      if (duree > 0 && prix > 0) {
+        newPlans[index].tarifHoraireEquivalent = ((prix / duree) * 60).toFixed(2);
+      }
+    }
+
     setPlansTarifaires(newPlans);
   };
 
@@ -125,11 +149,17 @@ const TypePosteForm = ({ typePoste, onClose }) => {
       ...prev,
       {
         nom: '',
-        dureeMinutes: '',
+        dureeMinutesMin: '',
+        dureeMinutesMax: '',
         prix: '',
         description: '',
         estActif: true,
-        ordre: prev.length
+        estMisEnAvant: false,
+        heureDebutValidite: '',
+        heureFinValidite: '',
+        joursValidite: [],
+        ordreAffichage: prev.length,
+        tarifHoraireEquivalent: 0
       }
     ]);
   };
@@ -138,6 +168,7 @@ const TypePosteForm = ({ typePoste, onClose }) => {
     setPlansTarifaires(prev => prev.filter((_, i) => i !== index));
   };
 
+  // ✅ AMÉLIORÉ: Validation avec nouvelles règles
   const validateForm = () => {
     const errors = {};
     
@@ -150,17 +181,32 @@ const TypePosteForm = ({ typePoste, onClose }) => {
     if (!formData.tarifHoraireBase || isNaN(formData.tarifHoraireBase) || parseFloat(formData.tarifHoraireBase) <= 0) {
       errors.tarifHoraireBase = translations.hourlyRateInvalid || 'Le tarif horaire doit être un nombre positif';
     }
+
+    if (formData.dureeMinSession && (isNaN(formData.dureeMinSession) || parseInt(formData.dureeMinSession) < 5)) {
+      errors.dureeMinSession = 'La durée minimum doit être au moins 5 minutes';
+    }
+
+    if (formData.intervalleFacturation && (isNaN(formData.intervalleFacturation) || parseInt(formData.intervalleFacturation) < 1)) {
+      errors.intervalleFacturation = 'L\'intervalle de facturation doit être au moins 1 minute';
+    }
     
     if (formData.couleur && !/^#[0-9A-F]{6}$/i.test(formData.couleur)) {
       errors.couleur = translations.colorInvalid || 'Le code couleur doit être au format hexadécimal (#000000)';
     }
     
+    // ✅ Validation des plans tarifaires
     plansTarifaires.forEach((plan, index) => {
-      if (plan.dureeMinutes && (isNaN(plan.dureeMinutes) || parseInt(plan.dureeMinutes) <= 0)) {
-        errors[`plan_${index}_duree`] = translations.planDurationInvalid || 'La durée doit être supérieure à 0';
+      if (plan.dureeMinutesMin && (isNaN(plan.dureeMinutesMin) || parseInt(plan.dureeMinutesMin) <= 0)) {
+        errors[`plan_${index}_dureeMin`] = 'La durée minimum doit être supérieure à 0';
+      }
+      if (plan.dureeMinutesMax && plan.dureeMinutesMin && parseInt(plan.dureeMinutesMax) <= parseInt(plan.dureeMinutesMin)) {
+        errors[`plan_${index}_dureeMax`] = 'La durée maximum doit être supérieure à la durée minimum';
       }
       if (plan.prix && (isNaN(plan.prix) || parseFloat(plan.prix) <= 0)) {
         errors[`plan_${index}_prix`] = translations.planPriceInvalid || 'Le prix doit être supérieur à 0';
+      }
+      if (plan.heureDebutValidite && plan.heureFinValidite && plan.heureDebutValidite >= plan.heureFinValidite) {
+        errors[`plan_${index}_heures`] = 'L\'heure de fin doit être après l\'heure de début';
       }
     });
     
@@ -168,6 +214,7 @@ const TypePosteForm = ({ typePoste, onClose }) => {
     return Object.keys(errors).length === 0;
   };
 
+  // ✅ AMÉLIORÉ: Soumission avec nouvelles données
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -180,28 +227,44 @@ const TypePosteForm = ({ typePoste, onClose }) => {
         nom: formData.nom?.trim(),
         description: formData.description?.trim() || null,
         tarifHoraireBase: parseFloat(formData.tarifHoraireBase),
-        devise: 'DH',
-        dureeMinSession: 15,
-        intervalleFacturation: 15,
+        devise: formData.devise || 'DH',
+        dureeMinSession: parseInt(formData.dureeMinSession) || 15,
+        intervalleFacturation: parseInt(formData.intervalleFacturation) || 15,
         icone: formData.icone?.trim() || null,
         couleur: formData.couleur || '#8b5cf6',
         ordreAffichage: 999,
         estActif: Boolean(formData.estActif)
       };
 
-      const cleanPlans = plansTarifaires.map((plan, index) => ({
-        nom: plan.nom?.trim() || `Plan ${plan.dureeMinutes || index + 1} min`,
-        dureeMinutes: parseInt(plan.dureeMinutes) || 60,
-        prix: parseFloat(plan.prix) || 0,
-        description: plan.description?.trim() || null,
-        estActif: Boolean(plan.estActif !== false),
-        ordre: index
-      })).filter(plan => plan.dureeMinutes > 0 && plan.prix >= 0);
+      // ✅ CORRIGÉ: Nettoyage des plans tarifaires
+      const cleanPlans = plansTarifaires.map((plan, index) => {
+        const cleanPlan = {
+          nom: plan.nom?.trim() || `Plan ${plan.dureeMinutesMin || (index + 1) * 30} min`,
+          dureeMinutesMin: parseInt(plan.dureeMinutesMin) || 30,
+          dureeMinutesMax: plan.dureeMinutesMax ? parseInt(plan.dureeMinutesMax) : null,
+          prix: parseFloat(plan.prix) || 0,
+          description: plan.description?.trim() || null,
+          estActif: Boolean(plan.estActif !== false),
+          estMisEnAvant: Boolean(plan.estMisEnAvant),
+          heureDebutValidite: plan.heureDebutValidite || null,
+          heureFinValidite: plan.heureFinValidite || null,
+          joursValidite: Array.isArray(plan.joursValidite) ? plan.joursValidite : [],
+          ordreAffichage: index + 1,
+          typePlan: plan.typePlan || 'STANDARD',
+          estPromo: Boolean(plan.estPromo),
+          nbUtilisations: 0,
+          chiffreAffaireGenere: 0
+        };
 
-      const dataToSubmit = {
-        typePosteData: cleanFormData,
-        plansTarifaires: cleanPlans
-      };
+        // ✅ Calculer le tarif horaire équivalent côté client
+        if (cleanPlan.dureeMinutesMin > 0 && cleanPlan.prix > 0) {
+          cleanPlan.tarifHoraireEquivalent = parseFloat(((cleanPlan.prix / cleanPlan.dureeMinutesMin) * 60).toFixed(2));
+        }
+
+        return cleanPlan;
+      }).filter(plan => plan.dureeMinutesMin > 0 && plan.prix >= 0);
+
+      console.log('📝 [TYPE_POSTE_FORM] Données à envoyer:', { cleanFormData, cleanPlans });
 
       if (isEdit) {
         await updateTypePosteMutation.mutateAsync({
@@ -210,7 +273,10 @@ const TypePosteForm = ({ typePoste, onClose }) => {
           plansTarifaires: cleanPlans
         });
       } else {
-        await createTypePosteMutation.mutateAsync(dataToSubmit);
+        await createTypePosteMutation.mutateAsync({
+          typePosteData: cleanFormData,
+          plansTarifaires: cleanPlans
+        });
       }
       
       onClose();
@@ -226,7 +292,7 @@ const TypePosteForm = ({ typePoste, onClose }) => {
       <div className={styles.container}>
         <div className={styles.modal}>
           
-          {/* ✅ Header compact */}
+          {/* Header (gardé identique) */}
           <div className={styles.header}>
             <div className="flex items-center space-x-3">
               <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 text-white">
@@ -237,7 +303,7 @@ const TypePosteForm = ({ typePoste, onClose }) => {
                   {title}
                 </h2>
                 <p className={`text-xs ${styles.textSecondary}`}>
-                  🎮 Configuration gaming
+                  🎮 Configuration gaming avancée
                 </p>
               </div>
             </div>
@@ -250,10 +316,10 @@ const TypePosteForm = ({ typePoste, onClose }) => {
             </button>
           </div>
 
-          {/* Form compact */}
+          {/* Form avec nouvelles sections */}
           <form onSubmit={handleSubmit} className="p-4 space-y-6">
             
-            {/* ✅ Section Informations de base - Compact */}
+            {/* ✅ Section Informations de base - ÉTENDUE */}
             <div className={styles.card}>
               <div className="flex items-center space-x-2 mb-4">
                 <Tag size={16} className="text-purple-400" />
@@ -262,8 +328,8 @@ const TypePosteForm = ({ typePoste, onClose }) => {
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="lg:col-span-2">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-3">
                   <label htmlFor="nom" className={`block text-sm font-medium mb-2 ${styles.textSecondary}`}>
                     Nom du type <span className="text-red-500">*</span>
                   </label>
@@ -300,11 +366,65 @@ const TypePosteForm = ({ typePoste, onClose }) => {
                       disabled={isSubmitting}
                     />
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-sm font-medium">
-                      DH
+                      {formData.devise}
                     </div>
                   </div>
                   {validationErrors.tarifHoraireBase && (
                     <p className="text-red-500 text-xs mt-1">{validationErrors.tarifHoraireBase}</p>
+                  )}
+                </div>
+
+                {/* ✅ NOUVEAU: Durée minimum session */}
+                <div>
+                  <label htmlFor="dureeMinSession" className={`block text-sm font-medium mb-2 ${styles.textSecondary}`}>
+                    Durée min. session
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="5"
+                      max="60"
+                      id="dureeMinSession"
+                      name="dureeMinSession"
+                      value={formData.dureeMinSession}
+                      onChange={handleChange}
+                      placeholder="15"
+                      className={`${styles.input} pr-12`}
+                      disabled={isSubmitting}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      min
+                    </div>
+                  </div>
+                  {validationErrors.dureeMinSession && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.dureeMinSession}</p>
+                  )}
+                </div>
+
+                {/* ✅ NOUVEAU: Intervalle facturation */}
+                <div>
+                  <label htmlFor="intervalleFacturation" className={`block text-sm font-medium mb-2 ${styles.textSecondary}`}>
+                    Intervalle facturation
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      id="intervalleFacturation"
+                      name="intervalleFacturation"
+                      value={formData.intervalleFacturation}
+                      onChange={handleChange}
+                      placeholder="15"
+                      className={`${styles.input} pr-12`}
+                      disabled={isSubmitting}
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      min
+                    </div>
+                  </div>
+                  {validationErrors.intervalleFacturation && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.intervalleFacturation}</p>
                   )}
                 </div>
 
@@ -332,6 +452,24 @@ const TypePosteForm = ({ typePoste, onClose }) => {
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label htmlFor="devise" className={`block text-sm font-medium mb-2 ${styles.textSecondary}`}>
+                    Devise
+                  </label>
+                  <select
+                    id="devise"
+                    name="devise"
+                    value={formData.devise}
+                    onChange={handleChange}
+                    className={styles.input}
+                    disabled={isSubmitting}
+                  >
+                    <option value="MAD">MAD (Dirham)</option>
+                    <option value="EUR">EUR (Euro)</option>
+                    <option value="USD">USD (Dollar)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="mt-4">
@@ -351,7 +489,7 @@ const TypePosteForm = ({ typePoste, onClose }) => {
               </div>
             </div>
 
-            {/* ✅ Section Icône - Compact */}
+            {/* Section Icône (gardée identique) */}
             <div className={styles.card}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-2">
@@ -369,7 +507,6 @@ const TypePosteForm = ({ typePoste, onClose }) => {
                 </button>
               </div>
 
-              {/* Aperçu compact */}
               <div className="flex items-center space-x-3 mb-3 p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10">
                 <div className="p-2 rounded-lg bg-white/10">
                   {formData.icone ? (
@@ -387,7 +524,6 @@ const TypePosteForm = ({ typePoste, onClose }) => {
                 </div>
               </div>
 
-              {/* Sélecteur compact */}
               {showIconSelector && (
                 <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white/5">
                   <GamingIconSelector
@@ -403,14 +539,18 @@ const TypePosteForm = ({ typePoste, onClose }) => {
               )}
             </div>
 
-            {/* ✅ Section Plans - Compact */}
+            {/* ✅ Section Plans tarifaires - AMÉLIORÉE */}
             <div className={styles.card}>
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center space-x-2">
                   <DollarSign size={16} className="text-green-400" />
                   <h3 className={`text-base font-semibold ${styles.textPrimary}`}>
-                    Plans ({plansTarifaires.length})
+                    Plans tarifaires ({plansTarifaires.length})
                   </h3>
+                  <div className="flex items-center space-x-1 text-xs text-blue-500">
+                    <Info size={12} />
+                    <span>Forfaits intelligents</span>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -423,62 +563,190 @@ const TypePosteForm = ({ typePoste, onClose }) => {
                 </button>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {plansTarifaires.map((plan, index) => (
-                  <div key={index} className="grid grid-cols-4 gap-3 p-3 rounded-lg bg-gray-100/50 dark:bg-gray-800/50">
-                    <input
-                      type="text"
-                      value={plan.nom || ''}
-                      onChange={(e) => handlePlanChange(index, 'nom', e.target.value)}
-                      placeholder="Nom du plan"
-                      className={`${styles.input} text-xs`}
-                      disabled={isSubmitting}
-                    />
+                  <div key={index} className="p-4 rounded-lg bg-gray-100/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
                     
-                    <input
-                      type="number"
-                      min="1"
-                      value={plan.dureeMinutes || ''}
-                      onChange={(e) => handlePlanChange(index, 'dureeMinutes', e.target.value)}
-                      placeholder="Min"
-                      className={`${styles.input} text-xs`}
-                      disabled={isSubmitting}
-                    />
-                    
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={plan.prix || ''}
-                      onChange={(e) => handlePlanChange(index, 'prix', e.target.value)}
-                      placeholder="Prix DH"
-                      className={`${styles.input} text-xs`}
-                      disabled={isSubmitting}
-                    />
-                    
-                    <button
-                      type="button"
-                      onClick={() => removePlan(index)}
-                      className="p-2 bg-red-500 hover:bg-red-600 text-white rounded transition-all"
-                      disabled={isSubmitting}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {/* Ligne 1: Nom et Statuts */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                      <div className="md:col-span-2">
+                        <label className={`block text-xs font-medium mb-1 ${styles.textSecondary}`}>
+                          Nom du plan
+                        </label>
+                        <input
+                          type="text"
+                          value={plan.nom || ''}
+                          onChange={(e) => handlePlanChange(index, 'nom', e.target.value)}
+                          placeholder="ex: Forfait 1h, Matinée..."
+                          className={`${styles.input} text-xs`}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      
+                      <div className="flex items-end space-x-2">
+                        <label className="flex items-center space-x-1">
+                          <input
+                            type="checkbox"
+                            checked={plan.estActif}
+                            onChange={(e) => handlePlanChange(index, 'estActif', e.target.checked)}
+                            className="w-3 h-3 text-green-600 rounded"
+                            disabled={isSubmitting}
+                          />
+                          <span className="text-xs text-green-600">Actif</span>
+                        </label>
+                        <label className="flex items-center space-x-1">
+                          <input
+                            type="checkbox"
+                            checked={plan.estMisEnAvant}
+                            onChange={(e) => handlePlanChange(index, 'estMisEnAvant', e.target.checked)}
+                            className="w-3 h-3 text-yellow-600 rounded"
+                            disabled={isSubmitting}
+                          />
+                          <span className="text-xs text-yellow-600">★ Vedette</span>
+                        </label>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removePlan(index)}
+                        className="self-end p-2 bg-red-500 hover:bg-red-600 text-white rounded transition-all"
+                        disabled={isSubmitting}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    {/* Ligne 2: Durées et Prix */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${styles.textSecondary}`}>
+                          Durée min (min)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={plan.dureeMinutesMin || ''}
+                          onChange={(e) => handlePlanChange(index, 'dureeMinutesMin', e.target.value)}
+                          placeholder="30"
+                          className={`${styles.input} text-xs`}
+                          disabled={isSubmitting}
+                        />
+                        {validationErrors[`plan_${index}_dureeMin`] && (
+                          <p className="text-red-500 text-xs mt-1">{validationErrors[`plan_${index}_dureeMin`]}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${styles.textSecondary}`}>
+                          Durée max (min)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={plan.dureeMinutesMax || ''}
+                          onChange={(e) => handlePlanChange(index, 'dureeMinutesMax', e.target.value)}
+                          placeholder="90"
+                          className={`${styles.input} text-xs`}
+                          disabled={isSubmitting}
+                        />
+                        {validationErrors[`plan_${index}_dureeMax`] && (
+                          <p className="text-red-500 text-xs mt-1">{validationErrors[`plan_${index}_dureeMax`]}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${styles.textSecondary}`}>
+                          Prix ({formData.devise})
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={plan.prix || ''}
+                          onChange={(e) => handlePlanChange(index, 'prix', e.target.value)}
+                          placeholder="25.00"
+                          className={`${styles.input} text-xs`}
+                          disabled={isSubmitting}
+                        />
+                        {validationErrors[`plan_${index}_prix`] && (
+                          <p className="text-red-500 text-xs mt-1">{validationErrors[`plan_${index}_prix`]}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${styles.textSecondary}`}>
+                          Tarif équiv./h
+                        </label>
+                        <div className={`${styles.input} text-xs bg-gray-100 dark:bg-gray-700 cursor-not-allowed`}>
+                          {plan.tarifHoraireEquivalent || '0.00'} {formData.devise}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ligne 3: Créneaux horaires (optionnel) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${styles.textSecondary}`}>
+                          Heure début validité (optionnel)
+                        </label>
+                        <input
+                          type="time"
+                          value={plan.heureDebutValidite || ''}
+                          onChange={(e) => handlePlanChange(index, 'heureDebutValidite', e.target.value)}
+                          className={`${styles.input} text-xs`}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${styles.textSecondary}`}>
+                          Heure fin validité (optionnel)
+                        </label>
+                        <input
+                          type="time"
+                          value={plan.heureFinValidite || ''}
+                          onChange={(e) => handlePlanChange(index, 'heureFinValidite', e.target.value)}
+                          className={`${styles.input} text-xs`}
+                          disabled={isSubmitting}
+                        />
+                        {validationErrors[`plan_${index}_heures`] && (
+                          <p className="text-red-500 text-xs mt-1">{validationErrors[`plan_${index}_heures`]}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${styles.textSecondary}`}>
+                        Description
+                      </label>
+                      <textarea
+                        value={plan.description || ''}
+                        onChange={(e) => handlePlanChange(index, 'description', e.target.value)}
+                        placeholder="Description du plan..."
+                        rows={2}
+                        className={`${styles.input} text-xs resize-none`}
+                        disabled={isSubmitting}
+                      />
+                    </div>
                   </div>
                 ))}
                 
                 {plansTarifaires.length === 0 && (
-                  <div className="text-center py-6 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-                    <Clock className={`mx-auto mb-2 ${styles.textSecondary}`} size={24} />
-                    <p className={`${styles.textSecondary} text-sm`}>
-                      Aucun plan - Tarif horaire utilisé
+                  <div className="text-center py-8 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                    <Clock className={`mx-auto mb-3 ${styles.textSecondary}`} size={32} />
+                    <p className={`${styles.textSecondary} text-sm font-medium`}>
+                      Aucun plan tarifaire
+                    </p>
+                    <p className={`${styles.textSecondary} text-xs mt-1`}>
+                      Le tarif horaire de base sera utilisé
                     </p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* État actif compact */}
+            {/* État actif (gardé identique) */}
             <div className="flex items-center space-x-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20">
               <input
                 type="checkbox"
@@ -494,7 +762,7 @@ const TypePosteForm = ({ typePoste, onClose }) => {
               </label>
             </div>
 
-            {/* ✅ Boutons compacts */}
+            {/* Boutons (gardés identiques) */}
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-300 dark:border-gray-600">
               <button
                 type="button"

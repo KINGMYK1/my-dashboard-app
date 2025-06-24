@@ -6,6 +6,8 @@ import { useAuth } from './contexts/AuthContext';
 import HomePage from './pages/Home/Home';
 import UsersPage from './pages/Users/Users';
 import MonitoringPage from './pages/Monitoring/Monitoring';
+import HistoriqueSessions from './pages/Sessions/HistoriqueSessions';
+// import HistoriqueSessions from './pages/Sessions/HistoriqueSessions';
 
 // ✅ CORRECTION: Import des pages manquantes (lazy loading)
 const SettingsPage = lazy(() => import('./pages/Settings/Settings'));
@@ -14,6 +16,12 @@ const RolesPage = lazy(() => import('./pages/Roles/Roles'));
 const PermissionsPage = lazy(() => import('./pages/Permissions/Permissions'));
 const Notifications = lazy(() => import('./pages/Notifications/Notifications'));
 const TypesPostesPage = lazy(() => import('./pages/Postes/TypesPostes'));
+
+// ✅ AJOUT: Import des nouvelles pages de statistiques
+const StatistiquesPage = lazy(() => import('./pages/Statistiques/Statistiques'));
+const DashboardPostesPage = lazy(() => import('./pages/Statistiques/DashboardPostes'));
+const HistoriqueSessionsPage = lazy(() => import('./pages/Statistiques/HistoriqueSessions'));
+const Sessions = React.lazy(() => import('./pages/Sessions/Sessions'));
 
 // Préchargez les modules de manière progressive
 const preloadRoutes = () => {
@@ -82,13 +90,53 @@ const AppRoutes = () => {
             ? <PermissionsPage /> 
             : <Navigate to="/" replace />
         } />
-        
+        <Route path="/sessions" element={
+          hasPermission('SESSIONS_VIEW')
+            ? <Sessions /> 
+            : <Navigate to="/" replace />
+        } />
+       
         {/* Page de notifications accessible à tous les utilisateurs connectés */}
         <Route path="/notifications" element={<Notifications />} />
         
         {/* Paramètres - accessible à tous */}
         <Route path="/settings" element={<SettingsPage />} />
         
+        {/* Routes pour les statistiques - accessible avec la permission SESSIONS_VIEW */}
+        
+            <Route 
+              path="/statistiques" 
+              element={
+                <Suspense fallback={<InvisibleLoader />}>
+                  <StatistiquesPage />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/dashboard-postes" 
+              element={
+                <Suspense fallback={<InvisibleLoader />}>
+                  <DashboardPostesPage />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/historique-sessions" 
+              element={
+                <Suspense fallback={<InvisibleLoader />}>
+                  <HistoriqueSessionsPage />
+                </Suspense>
+              } 
+            />
+         <Route 
+              path="/historique" 
+              element={
+                <Suspense fallback={<InvisibleLoader />}>
+                  <HistoriqueSessions />
+                </Suspense>
+              } 
+            />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

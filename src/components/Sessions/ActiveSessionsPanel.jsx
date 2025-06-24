@@ -1,17 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, User, Monitor, Settings, Pause, Play, Square, ExternalLink, RefreshCw, XCircle, Plus, Info, Euro, Gamepad2, AlertCircle } from 'lucide-react';
+import { Clock, User, Monitor, Pause, Play, Square, Settings } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
+// ✅ CORRIGÉ: Import du bon hook
+import { useSessionsActives } from '../../hooks/useSessions';
+import SessionCard from './SessionCard';
+import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 
-const ActiveSessionsPanel = ({
-  sessions = [],
-  isLoading = false,
-  onOpenSessionActions = () => {}, // Function passed from parent to open the action modal
-  isPausedTab = false, // New prop to adapt behavior if it's the "paused" tab
+const ActiveSessionsPanel = ({ 
+  onSessionAction, 
+  compact = false,
+  maxSessions = null 
 }) => {
   const { effectiveTheme } = useTheme();
   const { translations } = useLanguage();
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // ✅ CORRIGÉ: Utilisation du hook corrigé
+  const { 
+    data: sessionsData, 
+    isLoading, 
+    isError, 
+    error 
+  } = useSessionsActives();
+
   const isDarkMode = effectiveTheme === 'dark';
 
   const getTextColorClass = (isPrimary = false) => {
@@ -71,10 +83,9 @@ const ActiveSessionsPanel = ({
   };
 
   // Effect to continuously update live durations (e.g., every second)
-  const [currentTime, setCurrentTime] = useState(Date.now());
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentTime(Date.now());
+      setCurrentTime(new Date());
     }, 1000); // Update every second
     return () => clearInterval(interval);
   }, []);
@@ -84,24 +95,23 @@ const ActiveSessionsPanel = ({
     <>
       <div className={`p-6 rounded-xl shadow-md ${getBgColorClass()} ${getTextColorClass()}`}>
         <h2 className={`text-2xl font-bold mb-4 ${getTextColorClass(true)}`}>
-          {isPausedTab ? translations?.pausedSessions || 'Sessions en Pause' : translations?.activeSessions || 'Sessions Actives'}
+          {translations?.activeSessions || 'Sessions Actives'}
         </h2>
 
         {isLoading ? (
           <div className="flex justify-center items-center h-48">
             <LoadingSpinner />
             <span className="ml-2">
-              {isPausedTab ? translations?.loadingPausedSessions || 'Chargement des sessions en pause...' : translations?.loadingActiveSessions || 'Chargement des sessions actives...'}
+              {translations?.loadingActiveSessions || 'Chargement des sessions actives...'}
             </span>
           </div>
-        ) : sessions.length === 0 ? (
+        ) : sessionsData.length === 0 ? (
           <div className={`p-4 text-center ${getTextColorClass(false)}`}>
-            <AlertCircle size={24} className="mx-auto mb-2" />
-            <p>{isPausedTab ? translations?.noPausedSessions || 'Aucune session en pause.' : translations?.noActiveSessions || 'Aucune session active.'}</p>
+            <p>{translations?.noActiveSessions || 'Aucune session active.'}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {sessions.map((session) => (
+            {sessionsData.slice(0, maxSessions).map((session) => (
               <div
                 key={session.id}
                 className={`
@@ -196,7 +206,7 @@ const ActiveSessionsPanel = ({
                 <div className="flex justify-end mt-4 pt-4 border-t border-dashed border-gray-300 dark:border-gray-700 space-x-2">
                   {(session.statut === 'EN_COURS' || session.statut === 'EN_PAUSE') && (
                     <button
-                      onClick={() => onOpenSessionActions(session)}
+                      onClick={() => onSessionAction(session)}
                       className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors
                         ${isDarkMode
                           ? 'bg-blue-700 hover:bg-blue-600 text-white'
