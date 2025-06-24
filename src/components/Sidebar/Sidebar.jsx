@@ -19,7 +19,12 @@ import {
   ChevronRight,
   Gamepad2,PlayCircle,
   CreditCard, // ✅ NOUVEAU : Pour les abonnements
-  Star // ✅ NOUVEAU : Pour les types d'abonnements
+  Star, // ✅ NOUVEAU : Pour les types d'abonnements
+  TrendingUp, 
+  FileText, 
+  Clock, 
+  Target, 
+  PieChart 
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -172,8 +177,6 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     }
   ];
 
-  // Le reste du code reste identique...
-  
   // Filtrer les éléments du menu principal selon les permissions
   const filteredMenuItems = menuItems.filter(item => {
     if (!item.permission) return true;

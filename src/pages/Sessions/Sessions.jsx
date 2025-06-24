@@ -350,12 +350,7 @@ const Sessions = () => {
       return;
     }
 
-    console.log('🎯 [SESSIONS] Action session:', action, sessionId, additionalData);
-    
-    const validSessionId = parseInt(sessionId, 10);
-    if (!validSessionId || isNaN(validSessionId)) {
-      throw new Error('ID de session invalide');
-    }
+    const validSessionId = parseInt(sessionId);
 
     try {
       let result;
@@ -363,12 +358,18 @@ const Sessions = () => {
       switch (action) {
         case 'pause': {
           console.log('⏸️ [SESSIONS] Exécution pause session:', validSessionId);
-          result = await pauseSessionMutation.mutateAsync(validSessionId);
+             
+          // ✅ CORRECTION: Utiliser le hook de mutation pour pause
+          result = await pauseSessionMutation.mutateAsync({
+            sessionId: validSessionId,
+            raison: additionalData.raison,
+            notes: additionalData.notes
+          });
           showSuccess('Session mise en pause');
           break;
         }
 
-        case 'resume': {
+        case 'reprendre': {
           console.log('▶️ [SESSIONS] Exécution reprise session:', validSessionId);
           result = await resumeSessionMutation.mutateAsync(validSessionId);
           showSuccess('Session reprise');
@@ -378,8 +379,8 @@ const Sessions = () => {
         case 'prolonger': {
           console.log('⏰ [SESSIONS] Exécution prolongation session:', validSessionId, additionalData);
           
-          const dureeSupplementaire = parseInt(additionalData.dureeSupplementaire, 10);
-          if (!dureeSupplementaire || dureeSupplementaire <= 0) {
+  const dureeSupplementaire = additionalData?.dureeSupplementaireMinutes;
+            if (!dureeSupplementaire || dureeSupplementaire <= 0) {
             throw new Error('Durée supplémentaire invalide');
           }
           
@@ -404,7 +405,7 @@ const Sessions = () => {
           console.log('📤 [SESSIONS] Données formatées pour l\'API:', terminaisonData);
           
           result = await terminerSessionMutation.mutateAsync({
-            sessionId: validSessionId,
+            sessionId,
             data: terminaisonData
           });
           showSuccess('Session terminée avec succès');
