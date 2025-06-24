@@ -149,7 +149,7 @@ const Sessions = () => {
       if (!isMounted) return;
       console.log('⚠️ [SESSIONS] Alerte session:', sessionId, minutesLeft);
     },
-    enableNotifications: isMounted,
+    enableNotifications: true,
     warningMinutes: [5, 1],
     updateInterval: 1000
   });
@@ -214,6 +214,7 @@ const Sessions = () => {
       numeroSession: session.numeroSession || `SESS-${session.id}`
     })).filter(session => session.id && session.dateHeureDebut);
   }, [isMounted, sessionsPauseData]);
+  
 
   const processedPostesData = useMemo(() => {
     if (!isMounted || !postesData) return [];
