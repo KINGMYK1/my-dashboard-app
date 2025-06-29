@@ -20,21 +20,32 @@ const SessionActionsModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // ✅ Calcul du montant estimé
+  // ✅ Utiliser directement le montant estimé stocké dans la session
   const montantEstime = React.useMemo(() => {
     if (!session) return 0;
 
+    // Priorité 1: Utiliser le montant calculé et stocké dans la session lors du démarrage
+    const montantStocke = session.montantTotal || session.coutCalculeFinal;
+    if (montantStocke && montantStocke > 0) {
+      console.log('💰 [SESSION_ACTIONS] Utilisation montant stocké:', montantStocke);
+      return parseFloat(montantStocke);
+    }
+
+    // Priorité 2: Utiliser le plan tarifaire si disponible
+    if (session.planTarifaire && session.planTarifaire.prix) {
+      console.log('📋 [SESSION_ACTIONS] Utilisation plan tarifaire:', session.planTarifaire.prix);
+      return parseFloat(session.planTarifaire.prix);
+    }
+
+    // Fallback: Calcul horaire (ne devrait pas arriver si le backend fonctionne bien)
+    console.warn('⚠️ [SESSION_ACTIONS] Fallback sur calcul horaire');
     const now = new Date();
     const startTime = new Date(session.dateHeureDebut);
     const pauseTimeMs = (session.tempsPauseTotalMinutes || 0) * 60 * 1000;
     
     const elapsedMs = Math.max(0, now.getTime() - startTime.getTime() - pauseTimeMs);
     const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
-
-    if (session.planTarifaire) {
-      return parseFloat(session.planTarifaire.prix || 0);
-    }
-
+    
     const tarifHoraire = session.poste?.typePoste?.tarifHoraireBase || 25;
     return (elapsedMinutes / 60) * tarifHoraire;
   }, [session]);

@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { sessionService } from '../services/sessionService';
+import  sessionService  from '../services/sessionService';
 import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
+// import { useCalculerPrixSession } from '../hooks/useCalculerPrixSession'; // ✅ AJOUT
+import api from '../api/apiService';
 
 // Helper function to invalidate relevant session caches
 const invalidateSessionCaches = (queryClient) => {
@@ -43,6 +45,8 @@ export function useSessionsActives() {
     }
   });
 }
+
+
 
 /**
  * ✅ CORRIGÉ: Hook pour récupérer les sessions en pause (ancien nom maintenu)
@@ -298,8 +302,6 @@ export const useProlongerSession = () => {
     }
   });
 };
-// ...existing code...
-
 /**
  * ✅ MAINTENU: Hook pour terminer une session
  */
@@ -350,8 +352,69 @@ export function useTerminerSession() {
     }
   });
 }
+/**
+ * ✅ NOUVEAU: Hook pour calculer le prix d'une session en temps réel
+ */
+/**
+ * ✅ Hook pour calculer le prix d'une session en temps réel
+ *//**
+ * ✅ Hook pour calculer le prix d'une session - CORRIGÉ
+ */
+export function useCalculerPrixSession() {
+  const { showError } = useNotification();
 
-// ...rest of existing code...
+  return useMutation({
+    mutationFn: async ({ posteId, dureeMinutes, abonnementId = null }) => {
+      console.log('💰 [HOOK] Calcul prix session:', { 
+        posteId, 
+        dureeMinutes, 
+        abonnementId,
+        posteIdType: typeof posteId,
+        dureeMinutesType: typeof dureeMinutes
+      });
+      
+      // ✅ Validation côté client
+      const posteIdNum = parseInt(posteId);
+      const dureeMinutesNum = parseInt(dureeMinutes);
+      
+      if (!posteIdNum || isNaN(posteIdNum) || posteIdNum <= 0) {
+        throw new Error('ID de poste invalide');
+      }
+      
+      if (!dureeMinutesNum || isNaN(dureeMinutesNum) || dureeMinutesNum <= 0) {
+        throw new Error('Durée invalide');
+      }
+
+      // ✅ CORRECTION: Ne pas envoyer abonnementId si null
+      const payload = {
+        posteId: posteIdNum,
+        dureeMinutes: dureeMinutesNum
+      };
+
+      // ✅ Ajouter abonnementId seulement s'il est valide
+      if (abonnementId && !isNaN(parseInt(abonnementId))) {
+        payload.abonnementId = parseInt(abonnementId);
+      }
+
+      console.log('💰 [HOOK] Payload envoyé:', payload);
+      
+      try {
+        const response = await api.post('/sessions/calculer-prix', payload);
+        console.log('💰 [HOOK] Réponse reçue:', response);
+        return response.data;
+      } catch (error) {
+        console.error('❌ [HOOK] Erreur calcul prix:', error.response?.data || error);
+        throw new Error(error.response?.data?.message || error.message || 'Erreur lors du calcul du prix');
+      }
+    },
+    // ✅ CORRECTION: Éviter les retry automatiques
+    retry: false,
+    onError: (error) => {
+      console.error('❌ [HOOK] Erreur calcul prix:', error);
+      showError(`Erreur lors du calcul du prix: ${error.message}`);
+    }
+  });
+}
 /**
  * ✅ MAINTENU: Hook pour annuler une session
  */
@@ -449,6 +512,9 @@ export function useCorrectSession() {
 }
 
 /**
+ * ✅ CORRIGÉ: Hook pour calculer le prix d'une session en temps réel
+ */
+/**
  * ✅ MAINTENU: Hook pour récupérer une session par ID
  */
 export function useSession(sessionId) {
@@ -471,3 +537,96 @@ export function useSession(sessionId) {
 
 // ✅ MAINTENU: Exports nommés pour compatibilité
 export { useSessionsActives as useSessions };
+
+/**
+ * ✅ HOOK POUR LES ACTIONS SUR LES SESSIONS
+ */
+export function useSessionActions() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+
+  // ✅ DÉMARRER UNE SESSION
+  const startSession = useMutation({
+    mutationFn: (sessionData) => sessionService.demarrerSession(sessionData),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['postes'] });
+      showSuccess('Session démarrée avec succès');
+    },
+    onError: (error) => {
+      console.error('❌ [USE_SESSION_ACTIONS] Erreur démarrage:', error);
+      showError(error.message || 'Erreur lors du démarrage de la session');
+    }
+  });
+
+  // ✅ TERMINER UNE SESSION
+  const endSession = useMutation({
+    mutationFn: ({ sessionId, options }) => sessionService.terminerSession(sessionId, options),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['postes'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      showSuccess('Session terminée avec succès');
+    },
+    onError: (error) => {
+      console.error('❌ [USE_SESSION_ACTIONS] Erreur terminaison:', error);
+      showError(error.message || 'Erreur lors de la terminaison de la session');
+    }
+  });
+
+  // ✅ TRAITER UN PAIEMENT DE SESSION
+  const processSessionPayment = useMutation({
+    mutationFn: ({ sessionId, paymentData }) => 
+      sessionService.processSessionPayment(sessionId, paymentData),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      showSuccess('Paiement enregistré avec succès');
+    },
+    onError: (error) => {
+      console.error('❌ [USE_SESSION_ACTIONS] Erreur paiement:', error);
+      showError(error.message || 'Erreur lors du traitement du paiement');
+    }
+  });
+
+  // ✅ PAUSE/REPRISE SESSION
+  const pauseSession = useMutation({
+    mutationFn: (sessionId) => sessionService.pauseSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      showSuccess('Session mise en pause');
+    },
+    onError: (error) => {
+      console.error('❌ [USE_SESSION_ACTIONS] Erreur pause:', error);
+      showError(error.message || 'Erreur lors de la mise en pause');
+    }
+  });
+
+  const resumeSession = useMutation({
+    mutationFn: (sessionId) => sessionService.resumeSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      showSuccess('Session reprise');
+    },
+    onError: (error) => {
+      console.error('❌ [USE_SESSION_ACTIONS] Erreur reprise:', error);
+      showError(error.message || 'Erreur lors de la reprise');
+    }
+  });
+
+  return {
+    startSession: (sessionData) => startSession.mutateAsync(sessionData),
+    endSession: (sessionId, options = {}) => endSession.mutateAsync({ sessionId, options }),
+    processSessionPayment: (sessionId, paymentData) => 
+      processSessionPayment.mutateAsync({ sessionId, paymentData }),
+    pauseSession: (sessionId) => pauseSession.mutateAsync(sessionId),
+    resumeSession: (sessionId) => resumeSession.mutateAsync(sessionId),
+    
+    // États de chargement
+    isStarting: startSession.isLoading,
+    isEnding: endSession.isLoading,
+    isProcessingPayment: processSessionPayment.isLoading,
+    isPausing: pauseSession.isLoading,
+    isResuming: resumeSession.isLoading
+  };
+}

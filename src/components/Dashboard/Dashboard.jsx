@@ -5,7 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import Header from '../Header/Header';
 import Sidebar from '../Sidebar/Sidebar';
 
-// ✅ CORRECTION: Imports manquants - ajouter tous les composants de pages
+// ✅ Pages principales
 import Home from '../../pages/Home/Home';
 import Users from '../../pages/Users/Users';
 import Roles from '../../pages/Roles/Roles';
@@ -15,25 +15,29 @@ import TypesPostes from '../../pages/Postes/TypesPostes';
 import Monitoring from '../../pages/Monitoring/Monitoring';
 import Settings from '../../pages/Settings/Settings';
 import Notifications from '../../pages/Notifications/Notifications';
+
+// ✅ Gaming Center
 import Clients from '../../pages/Clients/Clients';
-import Sessions from '../../pages/Sessions/Sessions'; // ✅ AJOUT important
+import Sessions from '../../pages/Sessions/Sessions';
 import TypesAbonnements from '../../pages/TypesAbonnements/TypesAbonnements';
 import Abonnements from '../../pages/Abonnements/Abonnements';
-import HistoriqueSessions from '../../pages/Sessions/HistoriqueSessions';
-// import TransactionsPage from '../../pages/Transactions/Transactions';
 
-// ✅ AJOUT: Composants manquants (créer si nécessaire)
+// ✅ CORRECTION: Pages Statistiques avec les bons chemins
+import StatistiquesPage from '../../pages/Statistiques/Statistiques';
+import DashboardPostes from '../../pages/Statistiques/DashboardPostes';
+import StatistiquesTransactions from '../../pages/Statistiques/StatistiquesTransactions';
+import HistoriqueSessions from '../../pages/Sessions/HistoriqueSessions';
+
+// ✅ Autres pages
 import Ventes from '../../pages/Ventes/Ventes';
 import Inventaire from '../../pages/Inventaire/Inventaire';
 import Evenements from '../../pages/Evenements/Evenements';
-
-// import Sidebar from '../Sidebar/Sidebar';
 
 const Dashboard = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const { user, hasPermission } = useAuth();
-  const { effectiveTheme } = useTheme(); // Utiliser effectiveTheme
+  const { effectiveTheme } = useTheme();
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -46,51 +50,23 @@ const Dashboard = () => {
 
     checkScreenSize();
     window.addEventListener('resize', checkScreenSize);
-
-    return () => {
-      window.removeEventListener('resize', checkScreenSize);
-    };
+    return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
   const toggleSidebar = () => {
     setSidebarExpanded(!sidebarExpanded);
   };
 
-  // Debug des permissions
-  useEffect(() => {
-    if (user) {
-      console.log('👤 Dashboard - Utilisateur:', {
-        id: user.id,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role?.name,
-        permissions: user.role?.permissions?.map(p => p.name || p) // ✅ Gestion des deux formats
-      });
-    }
-  }, [user]);
-
-  // Détection du mode sombre/clair basé sur effectiveTheme
   const isDarkMode = effectiveTheme === 'dark';
-
-  console.log('🎨 [DASHBOARD] Debug thème:', {
-    effectiveTheme,
-    isDarkMode,
-    themeType: typeof effectiveTheme
-  });
-
-  // Styles dynamiques harmonisés pour le fond du dashboard
+  
+  // Styles dynamiques
   const dashboardBackground = isDarkMode
-    ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%)'
-    : 'linear-gradient(135deg, #e0f2f7 0%, #e0f7fa 25%, #e0f9fd 50%, #e0faff 75%, #e0faff 100%)'; // Couleurs plus douces pour le thème clair
+    ? 'linear-gradient(135deg, #1e293b 0%, #334155 100%)'
+    : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
 
-  // Le fond du main content sera transparent, les pages géreront leur propre fond
-  const mainContentBg = 'transparent'; 
-  const mainContentBackdropFilter = 'none'; 
-
-  // Styles pour les éléments décoratifs adaptés au thème
-  const decorativeElementsOpacity = isDarkMode ? 0.05 : 0.03;
-  const gridOpacity = isDarkMode ? 0.05 : 0.02;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div 
@@ -100,67 +76,26 @@ const Dashboard = () => {
         minHeight: '100vh'
       }}
     >
-      {/* Éléments décoratifs adaptés au thème */}
-      <div 
-        className="absolute inset-0 pointer-events-none transition-opacity duration-500"
-        style={{
-          opacity: decorativeElementsOpacity,
-          backgroundImage: isDarkMode ? `
-            radial-gradient(circle at 10% 20%, #6366f1 0%, transparent 50%),
-            radial-gradient(circle at 90% 80%, #8b5cf6 0%, transparent 50%),
-            radial-gradient(circle at 30% 60%, #ec4899 0%, transparent 50%)
-          ` : `
-            radial-gradient(circle at 10% 20%, #81d4fa 0%, transparent 50%), /* Bleu clair */
-            radial-gradient(circle at 90% 80%, #4fc3f7 0%, transparent 50%), /* Bleu ciel */
-            radial-gradient(circle at 30% 60%, #29b6f6 0%, transparent 50%)  /* Bleu plus vif */
-          `
-        }}
-      />
-      
-      {/* Grille de fond adaptée au thème */}
-      <div 
-        className="absolute inset-0 pointer-events-none transition-opacity duration-500"
-        style={{
-          opacity: gridOpacity,
-          backgroundImage: isDarkMode ? `
-            linear-gradient(rgba(139, 92, 246, 0.1) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(139, 92, 246, 0.1) 1px, transparent 1px)
-          ` : `
-            linear-gradient(rgba(0, 188, 212, 0.1) 1px, transparent 1px), /* Cyan clair */
-            linear-gradient(90deg, rgba(0, 188, 212, 0.1) 1px, transparent 1px)
-          `,
-          backgroundSize: '100px 100px'
-        }}
-      />
-
-      {/* Header (couleurs fixes, non affectées par le thème global) */}
       <Header 
         toggleSidebar={toggleSidebar}
         sidebarExpanded={sidebarExpanded}
         isMobile={isMobile}
       />
 
-      {/* Main content area */}
       <div className="flex flex-1 overflow-hidden relative z-10">
-        {/* Sidebar (couleurs fixes, non affectées par le thème global) */}
         <Sidebar
           expanded={sidebarExpanded}
           toggleSidebar={toggleSidebar}
           isMobile={isMobile}
         />
 
-        {/* Main content transparent - padding minimal */}
-        <main 
-          className="flex-1 overflow-auto p-7 transition-all duration-500"
-          style={{
-            backgroundColor: mainContentBg,
-            backdropFilter: mainContentBackdropFilter
-          }}
-        >
+        <main className="flex-1 overflow-auto p-7 transition-all duration-500">
           <div className="w-full h-full">
             <Routes>
+              {/* ✅ CORRECTION: Route par défaut vers Home */}
               <Route path="/" element={<Home />} />
               
+              {/* ✅ Pages principales */}
               <Route path="/users" element={
                 hasPermission('USERS_VIEW') ? <Users /> : <Navigate to="/dashboard" replace />
               } />
@@ -173,6 +108,7 @@ const Dashboard = () => {
                 hasPermission('PERMISSIONS_VIEW') ? <Permissions /> : <Navigate to="/dashboard" replace />
               } />
               
+              {/* ✅ Postes */}
               <Route path="/postes" element={
                 hasPermission('POSTES_VIEW') ? <Postes /> : <Navigate to="/dashboard" replace />
               } />
@@ -180,19 +116,12 @@ const Dashboard = () => {
               <Route path="/postes/types" element={
                 hasPermission('POSTES_MANAGE') ? <TypesPostes /> : <Navigate to="/dashboard" replace />
               } />
-              {/* <Route path="/transactions" element={
-                hasPermission('POSTES_MANAGE') ? <TransactionsPage /> : <Navigate to="/dashboard" replace />
-              } />
-               */}
-              <Route path="/monitoring" element={
-                hasPermission('MONITORING_VIEW') ? <Monitoring /> : <Navigate to="/dashboard" replace />
-              } />
-
+              
+              {/* ✅ Gaming Center */}
               <Route path="/clients" element={
                 hasPermission('CLIENTS_VIEW') ? <Clients /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* ✅ CORRECTION: Route Sessions décommentée et corrigée */}
               <Route path="/sessions" element={
                 hasPermission('SESSIONS_VIEW') ? <Sessions /> : <Navigate to="/dashboard" replace />
               } />
@@ -205,13 +134,26 @@ const Dashboard = () => {
                 hasPermission('ABONNEMENTS_VIEW') ? <Abonnements /> : <Navigate to="/dashboard" replace />
               } />
               
-              {/* ✅ AJOUT: Nouvelles routes (créer les composants si nécessaire) */}
+              {/* ✅ CORRECTION: Routes Statistiques avec les bons chemins */}
+              <Route path="/statistiques" element={
+                hasPermission('SESSIONS_VIEW') ? <StatistiquesPage /> : <Navigate to="/dashboard" replace />
+              } />
               
+              <Route path="/dashboard-postes" element={
+                hasPermission('SESSIONS_VIEW') ? <DashboardPostes /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/statistiques-transactions" element={
+                hasPermission('SESSIONS_VIEW') ? <StatistiquesTransactions /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              <Route path="/historique-sessions" element={
+                hasPermission('SESSIONS_VIEW') ? <HistoriqueSessions /> : <Navigate to="/dashboard" replace />
+              } />
+              
+              {/* ✅ Autres pages */}
               <Route path="/ventes" element={
                 hasPermission('SALES_VIEW') ? <Ventes /> : <Navigate to="/dashboard" replace />
-              } />
-              <Route path="/historique-sessions" element={
-                hasPermission('SALES_VIEW') ? <HistoriqueSessions /> : <Navigate to="/dashboard" replace />
               } />
               
               <Route path="/inventaire" element={
@@ -221,7 +163,10 @@ const Dashboard = () => {
               <Route path="/evenements" element={
                 hasPermission('EVENTS_VIEW') ? <Evenements /> : <Navigate to="/dashboard" replace />
               } />
-             
+              
+              <Route path="/monitoring" element={
+                hasPermission('MONITORING_VIEW') ? <Monitoring /> : <Navigate to="/dashboard" replace />
+              } />
               
               <Route path="/settings" element={<Settings />} />
               <Route path="/notifications" element={<Notifications />} />

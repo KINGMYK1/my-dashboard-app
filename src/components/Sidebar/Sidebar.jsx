@@ -7,7 +7,7 @@ import {
   Key, 
   Settings, 
   LogOut, 
-  Monitor, 
+  Monitor, Activity ,Receipt ,
   UserPlus, 
   ShoppingCart, 
   Package, 
@@ -128,7 +128,7 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
         }
       ]
     },
-    // ✅ NOUVEAU: Menu Analyses avec sous-menu
+    // ✅ CORRECTION: Menu Analyses avec les bonnes routes
     {
       icon: <BarChart3 size={20} />,
       label: translations.analytics || 'Analyses',
@@ -144,15 +144,21 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
           permission: 'SESSIONS_VIEW'
         },
         {
-          icon: <BarChart3 size={18} />,
-          label: translations.detailedStatistics || 'Statistiques Détaillées',
-          path: '/dashboard/statistiques',
+          icon: <DollarSign size={18} />,
+          label: translations.transactionStats || 'Statistiques Transactions',
+          path: '/dashboard/statistiques-transactions',
           permission: 'SESSIONS_VIEW'
         },
         {
           icon: <Calendar size={18} />,
           label: translations.sessionHistory || 'Historique Sessions',
           path: '/dashboard/historique-sessions',
+          permission: 'SESSIONS_VIEW'
+        },
+        {
+          icon: <BarChart3 size={18} />,
+          label: translations.detailedStatistics || 'Vue d\'ensemble',
+          path: '/dashboard/statistiques',
           permission: 'SESSIONS_VIEW'
         }
       ]
@@ -174,7 +180,44 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
       label: translations.events || 'Événements', 
       path: '/dashboard/evenements',
       permission: 'EVENTS_VIEW' 
-    }
+    },
+    // ✅ Ajouter cette section statistiques à votre sidebar existant
+    // {
+    //   title: 'Statistiques',
+    //   icon: <BarChart3 className="w-5 h-5" />,
+    //   items: [
+    //     {
+    //       title: 'Tableau de Bord',
+    //       path: '/statistiques/tableau-de-bord',
+    //       icon: <Activity className="w-4 h-4" />,
+    //       permissions: ['DASHBOARD_VIEW']
+    //     },
+    //     {
+    //       title: 'Chiffre d\'Affaires',
+    //       path: '/statistiques/chiffre-affaires',
+    //       icon: <DollarSign className="w-4 h-4" />,
+    //       permissions: ['STATISTICS_VIEW']
+    //     },
+    //     {
+    //       title: 'Transactions',
+    //       path: '/statistiques/transactions',
+    //       icon: <Receipt className="w-4 h-4" />,
+    //       permissions: ['STATISTICS_VIEW']
+    //     },
+    //     {
+    //       title: 'Performance',
+    //       path: '/statistiques/performance',
+    //       icon: <TrendingUp className="w-4 h-4" />,
+    //       permissions: ['STATISTICS_VIEW']
+    //     },
+    //     {
+    //       title: 'Rapports',
+    //       path: '/statistiques/rapports',
+    //       icon: <FileText className="w-4 h-4" />,
+    //       permissions: ['REPORTS_VIEW']
+    //     }
+    //   ]
+    // }
   ];
 
   // Filtrer les éléments du menu principal selon les permissions

@@ -1,33 +1,30 @@
+import apiService from '../api/apiService';
+
 class StatistiquesService {
-  /**
-   * Récupérer les statistiques détaillées d'un poste
-   */
-  async getStatistiquesPosteDetaillees(posteId, params = {}) {
-    try {
-      console.log('📊 [STATS_SERVICE] Récupération stats détaillées poste:', posteId, params);
-      
-      const response = await api.get(`/sessions/poste/${posteId}/statistics-detaillees`, { params });
-      console.log('✅ [STATS_SERVICE] Stats détaillées récupérées:', response);
-      
-      return response;
-    } catch (error) {
-      console.error('❌ [STATS_SERVICE] Erreur stats poste:', error);
-      throw error;
-    }
+  constructor() {
+    this.baseURL = '/statistiques';
   }
 
   /**
-   * Récupérer le dashboard global des postes
+   * ✅ CORRECTION: Récupérer le dashboard des postes
    */
-  async getDashboardPostes(periode = 'semaine') {
+  async getDashboardPostes(filtres = {}) {
     try {
-      console.log('📊 [STATS_SERVICE] Récupération dashboard postes, période:', periode);
+      console.log('📊 [STATS_SERVICE] Récupération dashboard postes:', filtres);
       
-      const response = await api.get('/sessions/dashboard/postes', { 
-        params: { periode } 
-      });
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.dateDebut) params.append('dateDebut', filtres.dateDebut);
+      if (filtres.dateFin) params.append('dateFin', filtres.dateFin);
       
-      return response;
+      const queryString = params.toString();
+      const url = `/sessions/dashboard/postes${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await apiService.get(url);
+      
+      console.log('✅ [STATS_SERVICE] Dashboard postes récupéré:', response.data);
+      return response.data;
+      
     } catch (error) {
       console.error('❌ [STATS_SERVICE] Erreur dashboard postes:', error);
       throw error;
@@ -35,75 +32,160 @@ class StatistiquesService {
   }
 
   /**
-   * Comparer les performances entre postes
+   * ✅ NOUVEAU: Obtenir les statistiques complètes des transactions
    */
-  async comparerPostes(posteIds, dateDebut = null, dateFin = null) {
+  async obtenirStatistiquesCompletes(filtres = {}) {
     try {
-      console.log('📊 [STATS_SERVICE] Comparaison postes:', { posteIds, dateDebut, dateFin });
+      console.log('📊 [STATS_SERVICE] Récupération statistiques complètes:', filtres);
       
-      const payload = { posteIds };
-      if (dateDebut) payload.dateDebut = dateDebut;
-      if (dateFin) payload.dateFin = dateFin;
+      const params = new URLSearchParams();
+      if (filtres.dateDebut) params.append('dateDebut', filtres.dateDebut);
+      if (filtres.dateFin) params.append('dateFin', filtres.dateFin);
+      if (filtres.posteId) params.append('posteId', filtres.posteId);
+      if (filtres.clientId) params.append('clientId', filtres.clientId);
+      if (filtres.groupBy) params.append('groupBy', filtres.groupBy);
       
-      const response = await api.post('/sessions/comparer-postes', payload);
+      const queryString = params.toString();
+      const url = `/transactions/statistiques/completes${queryString ? `?${queryString}` : ''}`;
       
-      return response;
+      const response = await apiService.get(url);
+      
+      console.log('✅ [STATS_SERVICE] Statistiques complètes récupérées:', response.data);
+      return response.data;
+      
     } catch (error) {
-      console.error('❌ [STATS_SERVICE] Erreur comparaison postes:', error);
+      console.error('❌ [STATS_SERVICE] Erreur statistiques complètes:', error);
       throw error;
     }
   }
 
   /**
-   * Récupérer l'historique d'un poste
+   * ✅ CORRECTION: Récupérer les statistiques par poste
    */
-  async getHistoriquePoste(posteId, params = {}) {
+  async getStatistiquesPoste(posteId, filtres = {}) {
     try {
-      console.log('📊 [STATS_SERVICE] Récupération historique poste:', posteId, params);
+      console.log(`📊 [STATS_SERVICE] Récupération stats poste ${posteId}:`, filtres);
       
-      const response = await api.get(`/sessions/poste/${posteId}/historique`, { params });
+      const params = new URLSearchParams();
+      if (filtres.dateDebut) params.append('dateDebut', filtres.dateDebut);
+      if (filtres.dateFin) params.append('dateFin', filtres.dateFin);
+      if (filtres.periode) params.append('periode', filtres.periode);
       
-      return response;
+      const queryString = params.toString();
+      const url = `/sessions/poste/${posteId}/statistics${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await apiService.get(url);
+      
+      console.log('✅ [STATS_SERVICE] Stats poste récupérées:', response.data);
+      return response.data;
+      
     } catch (error) {
-      console.error('❌ [STATS_SERVICE] Erreur historique poste:', error);
+      console.error('❌ [STATS_SERVICE] Erreur stats poste:', error);
       throw error;
     }
   }
 
   /**
-   * Analyser les créneaux horaires d'un poste
+   * ✅ NOUVEAU: Tableau de bord financier
    */
-  async getAnalyseCreneauxHoraires(posteId, dateDebut = null, dateFin = null) {
+  async getTableauDeBordFinancier(options = {}) {
     try {
-      console.log('📊 [STATS_SERVICE] Analyse créneaux horaires:', { posteId, dateDebut, dateFin });
+      console.log('💰 [STATS_SERVICE] Récupération tableau de bord financier:', options);
       
-      const params = {};
-      if (dateDebut) params.dateDebut = dateDebut;
-      if (dateFin) params.dateFin = dateFin;
+      const params = new URLSearchParams();
+      if (options.dateDebut) params.append('dateDebut', options.dateDebut);
+      if (options.dateFin) params.append('dateFin', options.dateFin);
       
-      const response = await api.get(`/sessions/poste/${posteId}/creneaux-horaires`, { params });
+      const queryString = params.toString();
+      const url = `/transactions/tableau-de-bord${queryString ? `?${queryString}` : ''}`;
       
-      return response;
+      const response = await apiService.get(url);
+      
+      console.log('✅ [STATS_SERVICE] Tableau de bord financier récupéré:', response.data);
+      return response.data;
+      
     } catch (error) {
-      console.error('❌ [STATS_SERVICE] Erreur analyse créneaux:', error);
+      console.error('❌ [STATS_SERVICE] Erreur tableau de bord financier:', error);
       throw error;
     }
   }
 
   /**
-   * Récupérer l'historique général des sessions
+   * ✅ NOUVEAU: Comparaison de périodes
    */
-  async getHistoriqueGeneralSessions(params = {}) {
+  async comparerPeriodes(periodeActuelle, periodeComparaison) {
     try {
-      console.log('📊 [STATS_SERVICE] Récupération historique général:', params);
+      console.log('📈 [STATS_SERVICE] Comparaison périodes:', periodeActuelle, periodeComparaison);
       
-      const response = await api.get('/sessions/historique', { params });
+      const response = await apiService.post('/transactions/comparer-periodes', {
+        periodeActuelle,
+        periodeComparaison
+      });
       
-      return response;
+      console.log('✅ [STATS_SERVICE] Comparaison récupérée:', response.data);
+      return response.data;
+      
     } catch (error) {
-      console.error('❌ [STATS_SERVICE] Erreur historique général:', error);
+      console.error('❌ [STATS_SERVICE] Erreur comparaison périodes:', error);
       throw error;
     }
+  }
+
+  /**
+   * ✅ NOUVEAU: Statistiques par type de poste
+   */
+  async getStatistiquesTypePoste(typePosteId, filtres = {}) {
+    try {
+      console.log(`📊 [STATS_SERVICE] Stats type poste ${typePosteId}:`, filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.dateDebut) params.append('dateDebut', filtres.dateDebut);
+      if (filtres.dateFin) params.append('dateFin', filtres.dateFin);
+      
+      const queryString = params.toString();
+      const url = `/types-postes/${typePosteId}/statistiques${queryString ? `?${queryString}` : ''}`;
+      
+      const response = await apiService.get(url);
+      
+      console.log('✅ [STATS_SERVICE] Stats type poste récupérées:', response.data);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur stats type poste:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Formater une devise
+   */
+  formatCurrency(amount, currency = 'MAD') {
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2
+    }).format(amount || 0);
+  }
+
+  /**
+   * ✅ Formater un pourcentage
+   */
+  formatPercentage(value, decimals = 1) {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'percent',
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }).format((value || 0) / 100);
+  }
+
+  /**
+   * ✅ Calculer l'évolution entre deux valeurs
+   */
+  calculerEvolution(valeurActuelle, valeurPrecedente) {
+    if (!valeurPrecedente || valeurPrecedente === 0) {
+      return valeurActuelle > 0 ? 100 : 0;
+    }
+    return ((valeurActuelle - valeurPrecedente) / valeurPrecedente) * 100;
   }
 }
 

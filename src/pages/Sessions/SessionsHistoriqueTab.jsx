@@ -36,6 +36,24 @@ const SessionsHistoriqueTab = () => {
     refetch 
   } = useHistoriqueSessions(filters);
 
+  // ✅ AJOUT: Logs pour diagnostiquer les données reçues
+  React.useEffect(() => {
+    if (sessionsData && sessionsData.sessions) {
+      console.log('📋 [HISTORIQUE] Sessions reçues:', sessionsData.sessions.length);
+      console.log('📋 [HISTORIQUE] Première session exemple:', sessionsData.sessions[0]);
+      console.log('📋 [HISTORIQUE] Toutes les sessions avec montants:', 
+        sessionsData.sessions.map(s => ({
+          id: s.id,
+          numeroSession: s.numeroSession,
+          montantTotal: s.montantTotal,
+          montantPaye: s.montantPaye,
+          estPayee: s.estPayee,
+          statutPaiement: s.statutPaiement
+        }))
+      );
+    }
+  }, [sessionsData]);
+
   // ✅ CORRECTION: Fonctions helper pour les classes CSS
   const getTextColorClass = (isPrimary = false) => {
     return isDarkMode
@@ -160,7 +178,20 @@ const SessionsHistoriqueTab = () => {
     const montantPaye = parseFloat(session.montantPaye) || 0;
     const resteAPayer = Math.max(0, montantTotal - montantPaye);
 
-    if (resteAPayer <= 0.01) {
+    // ✅ AJOUT: Logs pour diagnostiquer
+    console.log('💰 [HISTORIQUE] Calcul statut paiement pour session:', {
+      sessionId: session.id,
+      numeroSession: session.numeroSession,
+      montantTotal: session.montantTotal,
+      montantPaye: session.montantPaye,
+      estPayee: session.estPayee,
+      montantTotalParsed: montantTotal,
+      montantPayeParsed: montantPaye,
+      resteAPayer,
+      statutPaiement: session.statutPaiement
+    });
+
+    if (resteAPayer <= 0.01 && montantTotal > 0) {
       return (
         <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
           Payée

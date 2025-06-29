@@ -1,80 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  TrendingUp, DollarSign, Calendar, BarChart3, 
-  PieChart, Activity, Clock, AlertTriangle 
-} from 'lucide-react';
-import { useNotification } from '../../contexts/NotificationContext';
-import { Card, Button, Select, DatePicker } from '../../components/ui';
-import StatistiquesChart from './components/StatistiquesChart';
-import TransactionsTable from './components/TransactionsTable';
-import PerformanceMetrics from './components/PerformanceMetrics';
-import { statistiquesService } from '../../services/statistiquesService';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useStatistiquesCompletes } from '../../hooks/useStatistiques';
+import { Card, CardHeader, CardContent } from '../../components/ui';
 
 const StatistiquesTransactions = () => {
-  const { showSuccess, showError } = useNotification();
-  
-  // États
-  const [loading, setLoading] = useState(false);
-  const [periode, setPeriode] = useState('mois');
-  const [groupBy, setGroupBy] = useState('day');
-  const [dateDebut, setDateDebut] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-  const [dateFin, setDateFin] = useState(new Date());
-  
-  // Données
-  const [statistiques, setStatistiques] = useState(null);
-  const [tableauDeBord, setTableauDeBord] = useState(null);
-  const [transactionsEnAttente, setTransactionsEnAttente] = useState([]);
-  const [comparaison, setComparaison] = useState(null);
+  const { effectiveTheme } = useTheme();
+  const [filtres, setFiltres] = useState({
+    dateDebut: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    dateFin: new Date().toISOString().split('T')[0],
+    groupBy: 'day'
+  });
 
-  // Charger les données
-  useEffect(() => {
-    chargerDonnees();
-  }, [periode, groupBy, dateDebut, dateFin]);
+  const {
+    data: statistiquesData,
+    isLoading,
+    error,
+    refetch
+  } = useStatistiquesCompletes(filtres);
 
-  const chargerDonnees = async () => {
-    setLoading(true);
-    try {
-      const [statsResult, dashboardResult, enAttenteResult] = await Promise.all([
-        statistiquesService.obtenirStatistiquesCompletes({
-          dateDebut: dateDebut.toISOString(),
-          dateFin: dateFin.toISOString(),
-          groupBy
-        }),
-        statistiquesService.obtenirTableauDeBordFinancier(),
-        statistiquesService.getTransactionsEnAttente({ limit: 10 })
-      ]);
+  const isDarkMode = effectiveTheme === 'dark';
 
-      setStatistiques(statsResult.data);
-      setTableauDeBord(dashboardResult.data);
-      setTransactionsEnAttente(enAttenteResult.data.transactions);
+  // ✅ CORRECTION: Extraire les données correctement
+  const statistiques = statistiquesData?.data || statistiquesData;
 
-      showSuccess('Statistiques mises à jour');
-    } catch (error) {
-      showError('Erreur lors du chargement des statistiques');
-      console.error('Erreur statistiques:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  console.log('📊 [STATS_TRANSACTIONS] Données reçues:', statistiquesData);
+  console.log('📊 [STATS_TRANSACTIONS] Statistiques extraites:', statistiques);
 
-  const chargerComparaison = async () => {
-    try {
-      const duree = dateFin - dateDebut;
-      const dateFinComparaison = new Date(dateDebut);
-      const dateDebutComparaison = new Date(dateDebut - duree);
-
-      const result = await statistiquesService.comparerPeriodes({
-        dateDebutActuelle: dateDebut.toISOString(),
-        dateFinActuelle: dateFin.toISOString(),
-        dateDebutComparaison: dateDebutComparaison.toISOString(),
-        dateFinComparaison: dateFinComparaison.toISOString(),
-        groupBy
-      });
-
-      setComparaison(result.data);
-    } catch (error) {
-      showError('Erreur lors de la comparaison');
-    }
+  const handleFiltreChange = (nouveauxFiltres) => {
+    setFiltres(prev => ({ ...prev, ...nouveauxFiltres }));
   };
 
   const formatCurrency = (amount) => {
@@ -84,206 +37,200 @@ const StatistiquesTransactions = () => {
     }).format(amount || 0);
   };
 
-  const formatPercentage = (value) => {
-    return `${(value || 0).toFixed(1)}%`;
+  const formatNumber = (num) => {
+    return new Intl.NumberFormat('fr-FR').format(num || 0);
   };
 
-  if (loading && !statistiques) {
+  if (error) {
+    console.error('Erreur statistiques:', error);
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center text-red-600">
+              <p>Erreur lors du chargement des statistiques</p>
+              <button 
+                onClick={() => refetch()}
+                className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Réessayer
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <span className="ml-2">Chargement des statistiques...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header avec filtres */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            📊 Statistiques des Transactions
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Analyse détaillée des performances financières
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <Select
-            value={periode}
-            onChange={setPeriode}
-            options={[
-              { value: 'semaine', label: 'Cette semaine' },
-              { value: 'mois', label: 'Ce mois' },
-              { value: 'trimestre', label: 'Ce trimestre' },
-              { value: 'annee', label: 'Cette année' }
-            ]}
-          />
-          
-          <Select
-            value={groupBy}
-            onChange={setGroupBy}
-            options={[
-              { value: 'hour', label: 'Par heure' },
-              { value: 'day', label: 'Par jour' },
-              { value: 'week', label: 'Par semaine' },
-              { value: 'month', label: 'Par mois' }
-            ]}
-          />
-
-          <DatePicker
-            value={dateDebut}
-            onChange={setDateDebut}
-            label="Date début"
-          />
-
-          <DatePicker
-            value={dateFin}
-            onChange={setDateFin}
-            label="Date fin"
-          />
-
-          <Button
-            onClick={chargerComparaison}
-            variant="outline"
-            icon={<BarChart3 className="w-4 h-4" />}
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          Statistiques des Transactions
+        </h1>
+        <div className="flex gap-2">
+          <button
+            onClick={() => refetch()}
+            disabled={isLoading}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
           >
-            Comparer
-          </Button>
-
-          <Button
-            onClick={chargerDonnees}
-            disabled={loading}
-            icon={<Activity className="w-4 h-4" />}
-          >
-            Actualiser
-          </Button>
+            {isLoading ? 'Chargement...' : 'Actualiser'}
+          </button>
         </div>
       </div>
 
-      {/* Métriques principales */}
-      {statistiques && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Chiffre d'Affaires
-                </p>
-                <p className="text-2xl font-bold text-green-600">
+      {/* Filtres */}
+      <Card>
+        <CardHeader>
+          <h3 className="text-lg font-semibold">Filtres</h3>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Date début</label>
+              <input
+                type="date"
+                value={filtres.dateDebut}
+                onChange={(e) => handleFiltreChange({ dateDebut: e.target.value })}
+                className={`w-full p-2 border rounded ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                }`}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Date fin</label>
+              <input
+                type="date"
+                value={filtres.dateFin}
+                onChange={(e) => handleFiltreChange({ dateFin: e.target.value })}
+                className={`w-full p-2 border rounded ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                }`}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Groupement</label>
+              <select
+                value={filtres.groupBy}
+                onChange={(e) => handleFiltreChange({ groupBy: e.target.value })}
+                className={`w-full p-2 border rounded ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-900'
+                }`}
+              >
+                <option value="hour">Par heure</option>
+                <option value="day">Par jour</option>
+                <option value="week">Par semaine</option>
+                <option value="month">Par mois</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ✅ CORRECTION: Métriques simplifiées si pas de composant dédié */}
+      {statistiques?.resume && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold">Résumé de la période</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {formatNumber(statistiques.resume.totalTransactions)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Transactions</div>
+              </div>
+              
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
                   {formatCurrency(statistiques.resume.chiffreAffaireBrut)}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Encaissé: {formatCurrency(statistiques.resume.chiffreAffaireEncaisse)}
-                </p>
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">CA Brut</div>
               </div>
-              <DollarSign className="w-8 h-8 text-green-600" />
-            </div>
-            {comparaison && (
-              <div className="mt-2 flex items-center">
-                <TrendingUp className={`w-4 h-4 mr-1 ${
-                  comparaison.evolution.chiffreAffaire >= 0 ? 'text-green-500' : 'text-red-500'
-                }`} />
-                <span className={`text-sm ${
-                  comparaison.evolution.chiffreAffaire >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {formatPercentage(comparaison.evolution.chiffreAffaire)}
-                </span>
+              
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {formatCurrency(statistiques.resume.chiffreAffaireEncaisse)}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">CA Encaissé</div>
               </div>
-            )}
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Transactions
-                </p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {statistiques.resume.totalTransactions}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Validées: {statistiques.resume.transactionsValidees}
-                </p>
-              </div>
-              <BarChart3 className="w-8 h-8 text-blue-600" />
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Panier Moyen
-                </p>
-                <p className="text-2xl font-bold text-purple-600">
+              
+              <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">
                   {formatCurrency(statistiques.resume.panierMoyen)}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Performance: {formatPercentage(statistiques.performance.tauxPaiementComplet)}
-                </p>
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Panier Moyen</div>
               </div>
-              <PieChart className="w-8 h-8 text-purple-600" />
             </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  En Attente
-                </p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {formatCurrency(statistiques.resume.montantEnAttente)}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {statistiques.resume.transactionsEnAttente} transactions
-                </p>
-              </div>
-              <Clock className="w-8 h-8 text-orange-600" />
-            </div>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Graphiques et tableaux */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Évolution temporelle */}
-        {statistiques && (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Évolution du Chiffre d'Affaires</h3>
-            <StatistiquesChart 
-              data={statistiques.evolutionTemporelle}
-              type="line"
-              dataKey="chiffreAffaire"
-              xAxisKey="periode"
-            />
-          </Card>
-        )}
+      {/* ✅ CORRECTION: Table simple des données d'évolution */}
+      {statistiques?.evolutionTemporelle && statistiques.evolutionTemporelle.length > 0 && (
+        <Card>
+          <CardHeader>
+            <h3 className="text-lg font-semibold">Évolution Temporelle</h3>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full table-auto">
+                <thead>
+                  <tr className={`border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <th className="text-left p-2">Période</th>
+                    <th className="text-right p-2">Transactions</th>
+                    <th className="text-right p-2">Chiffre d'Affaires</th>
+                    <th className="text-right p-2">Montant Encaissé</th>
+                    <th className="text-right p-2">Panier Moyen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statistiques.evolutionTemporelle.map((periode, index) => (
+                    <tr key={index} className={`border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <td className="p-2">{periode.periode}</td>
+                      <td className="text-right p-2">{formatNumber(periode.nombreTransactions)}</td>
+                      <td className="text-right p-2">{formatCurrency(periode.chiffreAffaire)}</td>
+                      <td className="text-right p-2">{formatCurrency(periode.montantEncaisse)}</td>
+                      <td className="text-right p-2">{formatCurrency(periode.panierMoyen)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Répartition par statut */}
-        {statistiques && (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Répartition par Statut</h3>
-            <StatistiquesChart 
-              data={statistiques.repartitions.parStatut}
-              type="pie"
-              dataKey="montantTotal"
-              nameKey="statut"
-            />
-          </Card>
-        )}
-      </div>
+      {/* Message si pas de données */}
+      {!statistiques || (!statistiques.resume && !statistiques.evolutionTemporelle) && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center text-gray-500">
+              <p>Aucune donnée disponible pour la période sélectionnée</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
 
-      {/* Transactions en attente */}
-      {transactionsEnAttente.length > 0 && (
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold flex items-center">
-              <AlertTriangle className="w-5 h-5 mr-2 text-orange-500" />
-              Transactions en Attente de Paiement
-            </h3>
-            <Button
-              variant="outline"
-              size=
+export default StatistiquesTransactions;

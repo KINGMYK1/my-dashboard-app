@@ -22,12 +22,19 @@ export { default as Button, Button as ButtonComponent } from './Button';
 export { default as Tabs } from './Tabs/Tabs';
 export { default as Tab } from './Tabs/Tab';
 
-// Nouveaux composants ajoutés avec exports nommés ET par défaut
-export * from './Dialog';
-export { default as Dialog } from './Dialog';
-
+// Formulaires
 export { default as Input, Input as InputComponent } from './Input';
 export { default as Label, Label as LabelComponent } from './Label';
-export { default as Textarea, Textarea as TextareaComponent } from './Textarea';
-export { default as Checkbox, Checkbox as CheckboxComponent } from './Checkbox'; // ✅ AJOUT
+export { default as Checkbox, Checkbox as CheckboxComponent } from './Checkbox';
+
+// ✅ CORRECTION: Un seul export pour TextArea (en utilisant le fichier Textarea.jsx)
+export { default as TextArea, TextArea as TextAreaComponent } from './Textarea';
+
+// Modals et Dialogs
+export { default as Modal, Modal as ModalComponent } from './Modal';
+export { default as Dialog } from './Dialog';
 export { default as ConfirmationModal } from './ConfirmationModal';
+
+// ✅ CORRECTION: Exports simplifiés
+export * from './Dialog';
+export * from './Modal';

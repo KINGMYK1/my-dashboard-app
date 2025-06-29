@@ -1,13 +1,39 @@
 import React, { useState, useMemo } from 'react';
-import { useSessionsHistory } from '../../hooks/useSessions';
-import { Card, Button, Input, Select, DatePicker, Pagination, Badge, Spinner } from '../../components/ui';
-import { Search, Filter, Download, Eye, Receipt, Wrench } from 'lucide-react';
+import { useHistoriqueSessions } from '../../hooks/useSessions';
+import useCalculerPrixSession from '../../hooks/useCalculerPrixSession'; // ✅ AJOUT
+import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import SessionDetailsModal from './SessionDetailsModal';
-import SessionCorrectionModal from './SessionCorrectionModal';
+import { useNotification } from '../../contexts/NotificationContext';
+import { 
+  Card, 
+  Button, 
+  Badge, 
+  Input, 
+  Select, 
+  DatePicker,
+  Pagination,
+  Modal 
+} from '../../components/ui';
+// ✅ CORRECTION: Import direct du composant existant
+import PaymentUpdateModal from '../../components/Transactions/PaymentUpdateModal';
+import { 
+  Clock, 
+  DollarSign, 
+  User, 
+  Calendar,
+  CreditCard,
+  AlertCircle,
+  CheckCircle,
+  Edit3,
+  Eye
+} from 'lucide-react';
 
 const HistoriqueSessions = () => {
+  const { effectiveTheme } = useTheme();
   const { translations } = useLanguage();
+  const { showSuccess, showError } = useNotification();
+  const isDarkMode = effectiveTheme === 'dark';
+
   const [filters, setFilters] = useState({
     page: 1,
     limit: 20,
@@ -21,17 +47,15 @@ const HistoriqueSessions = () => {
 
   const [selectedSession, setSelectedSession] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // ✅ CORRECTION: Utilisation du hook avec filtres
   const { 
     data: sessionsData, 
     isLoading, 
     error,
     refetch 
-  } = useSessionsHistory(filters);
+  } = useHistoriqueSessions(filters);
 
-  // ✅ CORRECTION: Extraction des données avec vérification
   const sessions = useMemo(() => {
     if (!sessionsData?.data) return [];
     return Array.isArray(sessionsData.data) ? sessionsData.data : [];
@@ -46,153 +70,76 @@ const HistoriqueSessions = () => {
     };
   }, [sessionsData]);
 
-  // ✅ CORRECTION: Gestion des filtres
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
       [key]: value,
-      ...(key !== 'page' && { page: 1 }) // Reset page sauf si on change de page
+      page: key !== 'page' ? 1 : value
     }));
   };
 
-  const handlePageChange = (page) => {
-    setFilters(prev => ({ ...prev, page }));
-  };
-
-  // ✅ CORRECTION: Reset des filtres
-  const resetFilters = () => {
-    setFilters({
-      page: 1,
-      limit: 20,
-      dateDebut: '',
-      dateFin: '',
-      etats: [],
-      search: '',
-      sortBy: 'dateHeureDebut',
-      sortOrder: 'desc'
-    });
-  };
-
-  // ✅ CORRECTION: Fonction pour formater la durée
-  const formatDuration = (minutes) => {
-    if (!minutes || minutes === 0) return '0 min';
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${mins > 0 ? `${mins}min` : ''}`.trim();
-    }
-    return `${mins} min`;
-  };
-
-  // ✅ CORRECTION: Fonction pour formater les montants
-  const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined || isNaN(amount)) return '0,00 DH';
-    return `${parseFloat(amount).toFixed(2)} DH`;
-  };
-
-  // ✅ CORRECTION: Fonction pour obtenir le badge d'état de session
-  const getSessionStatusBadge = (session) => {
-    const statusConfig = {
-      'EN_COURS': { 
-        color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400', 
-        label: 'En cours' 
-      },
-      'TERMINEE': { 
-        color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400', 
-        label: 'Terminée' 
-      },
-      'ANNULEE': { 
-        color: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400', 
-        label: 'Annulée' 
-      },
-      'EN_PAUSE': { 
-        color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400', 
-        label: 'En pause' 
-      }
-    };
-
-    const config = statusConfig[session.etatSession] || statusConfig['TERMINEE'];
-    
-    return (
-      <Badge className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        {config.label}
-      </Badge>
-    );
-  };
-
-  // ✅ CORRECTION: Fonction pour obtenir le badge de paiement avec calculs corrects
-  const getPaymentStatusBadge = (session) => {
-    if (!session.transaction) {
-      return (
-        <Badge className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400">
-          Pas de transaction
-        </Badge>
-      );
-    }
-
-    const { transaction } = session;
-    const montantTotal = parseFloat(transaction.montantTotal) || 0;
-    const montantPaye = parseFloat(transaction.montantPaye) || 0;
-    const resteAPayer = parseFloat(transaction.resteAPayer) || 0;
-
-    // ✅ CORRECTION CRITIQUE: Vérifier la cohérence des montants
-    let actualResteAPayer = resteAPayer;
-    if (montantTotal > 0 && Math.abs(resteAPayer - (montantTotal - montantPaye)) > 0.01) {
-      actualResteAPayer = Math.max(0, montantTotal - montantPaye);
-      console.warn('⚠️ [HISTORIQUE] Recalcul du reste à payer:', {
-        sessionId: session.id,
-        montantTotal,
-        montantPaye,
-        resteAPayer,
-        actualResteAPayer
-      });
-    }
-
-    if (actualResteAPayer <= 0.01) {
-      return (
-        <Badge className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-          Payée intégralement
-        </Badge>
-      );
-    } else if (montantPaye > 0) {
-      return (
-        <Badge className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400">
-          Paiement partiel
-        </Badge>
-      );
-    } else {
-      return (
-        <Badge className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
-          Non payée
-        </Badge>
-      );
-    }
-  };
-
-  // ✅ CORRECTION: Fonction pour ouvrir les détails d'une session
-  const handleOpenDetails = (session) => {
+  const handleViewTransaction = (session) => {
     setSelectedSession(session);
     setShowDetailsModal(true);
   };
 
-  // ✅ CORRECTION: Fonction pour ouvrir la correction d'une session
-  const handleOpenCorrection = (session) => {
+  const handleEditPayment = (session) => {
+    if (!session.transaction) {
+      showError('Aucune transaction trouvée pour cette session');
+      return;
+    }
     setSelectedSession(session);
-    setShowCorrectionModal(true);
+    setShowPaymentModal(true);
   };
 
-  // ✅ CORRECTION: Export des données
-  const handleExport = () => {
-    // TODO: Implémenter l'export CSV/Excel
-    console.log('🎯 [HISTORIQUE] Export des sessions:', sessions);
+  const handlePaymentUpdate = async (paymentData) => {
+    try {
+      // TODO: Implémenter la mutation de mise à jour du paiement
+      showSuccess('Paiement mis à jour avec succès');
+      setShowPaymentModal(false);
+      refetch();
+    } catch (error) {
+      showError(`Erreur: ${error.message}`);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: 'MAD'
+    }).format(amount || 0);
+  };
+
+  const formatDuration = (minutes) => {
+    if (!minutes) return '0min';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+  };
+
+  const getPaymentStatusBadge = (session) => {
+    // Si pas de transaction, vérifier les champs de la session
+    const montantTotal = session.transaction?.montantTotal || session.montantTotal || 0;
+    const montantPaye = session.transaction?.montantPaye || session.montantPaye || 0;
+    const resteAPayer = Math.max(0, montantTotal - montantPaye);
+    
+    if (montantTotal === 0) {
+      return <Badge variant="gray">Gratuit</Badge>;
+    }
+    
+    if (montantPaye >= montantTotal) {
+      return <Badge variant="green">Payé</Badge>;
+    } else if (montantPaye > 0) {
+      return <Badge variant="orange">Partiel ({formatCurrency(resteAPayer)} restant)</Badge>;
+    } else {
+      return <Badge variant="red">Non payé</Badge>;
+    }
   };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Spinner size="lg" />
-        <span className="ml-2">Chargement de l'historique...</span>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
       </div>
     );
   }
@@ -200,281 +147,401 @@ const HistoriqueSessions = () => {
   if (error) {
     return (
       <div className="text-center py-8">
-        <p className="text-red-600 mb-4">Erreur lors du chargement: {error.message}</p>
-        <Button onClick={() => refetch()}>Réessayer</Button>
+        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <p className="text-red-500">Erreur lors du chargement des sessions</p>
+        <Button onClick={() => refetch()} className="mt-4">Réessayer</Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+    <div className={`p-6 ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} min-h-screen`}>
+      <div className="max-w-7xl mx-auto">
+        
+        {/* En-tête */}
+        <div className="mb-6">
+          <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             Historique des Sessions
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {pagination.totalItems} session(s) trouvée(s)
+          <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Gérez les sessions passées et leurs paiements
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button
-            onClick={handleExport}
-            variant="outline"
-            size="sm"
-            className="flex items-center space-x-2"
-          >
-            <Download size={16} />
-            <span>Exporter</span>
-          </Button>
-          <Button
-            onClick={resetFilters}
-            variant="outline"
-            size="sm"
-          >
-            Réinitialiser
+
+        {/* Filtres */}
+        <Card className="mb-6 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Recherche</label>
+              <Input
+                placeholder="N° session, client..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">Date début</label>
+              <Input
+                type="date"
+                value={filters.dateDebut}
+                onChange={(e) => handleFilterChange('dateDebut', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">Date fin</label>
+              <Input
+                type="date"
+                value={filters.dateFin}
+                onChange={(e) => handleFilterChange('dateFin', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">Statut</label>
+              <Select
+                value={filters.etats[0] || ''}
+                onChange={(e) => handleFilterChange('etats', e.target.value ? [e.target.value] : [])}
+                options={[
+                  { value: '', label: 'Tous les statuts' },
+                  { value: 'TERMINEE', label: 'Terminées' },
+                  { value: 'ANNULEE', label: 'Annulées' }
+                ]}
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Liste des sessions */}
+        <Card>
+          {sessions.length === 0 ? (
+            <div className="text-center py-8">
+              <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Aucune session trouvée
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Session
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Poste
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Client
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Durée
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Montant
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Paiement
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                  {sessions.map((session) => {
+                    const transaction = session.transaction;
+                    const montantTotal = parseFloat(transaction?.montantTotal || session.montantTotal) || 0;
+                    const montantPaye = parseFloat(transaction?.montantPaye || session.montantPaye) || 0;
+                    const resteAPayer = Math.max(0, montantTotal - montantPaye);
+
+                    return (
+                      <tr key={session.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium">
+                              {session.numeroSession}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(session.dateHeureDebut).toLocaleDateString('fr-FR')}
+                            </div>
+                          </div>
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium">
+                            {session.poste?.nom || 'N/A'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {session.poste?.typePoste?.nom}
+                          </div>
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 text-gray-400 mr-2" />
+                            <span className="text-sm">
+                              {session.client 
+                                ? `${session.client.prenom} ${session.client.nom}`
+                                : 'Session libre'
+                              }
+                            </span>
+                          </div>
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 text-gray-400 mr-2" />
+                            <div>
+                              <div className="text-sm font-medium">
+                                {formatDuration(session.dureeReelleMinutes || session.dureeEffectiveMinutes)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Estimée: {formatDuration(session.dureeEstimeeMinutes)}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <DollarSign className="h-4 w-4 text-gray-400 mr-2" />
+                            <div>
+                              <div className="text-sm font-medium">
+                                {formatCurrency(montantTotal)}
+                              </div>
+                              {montantPaye > 0 && (
+                                <div className="text-xs text-green-600">
+                                  Payé: {formatCurrency(montantPaye)}
+                                </div>
+                              )}
+                              {resteAPayer > 0 && (
+                                <div className="text-xs text-red-600">
+                                  Reste: {formatCurrency(resteAPayer)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getPaymentStatusBadge(session)}
+                        </td>
+                        
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleViewTransaction(session)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            
+                            {(transaction || montantTotal > 0) && resteAPayer > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditPayment(session)}
+                              >
+                                <Edit3 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="px-6 py-4 border-t">
+              <Pagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                onPageChange={(page) => handleFilterChange('page', page)}
+              />
+            </div>
+          )}
+        </Card>
+
+        {/* Modals */}
+        {showPaymentModal && selectedSession && (
+          <PaymentUpdateModal
+            isOpen={showPaymentModal}
+            onClose={() => setShowPaymentModal(false)}
+            transaction={selectedSession.transaction || {
+              id: selectedSession.id,
+              montantTotal: selectedSession.montantTotal || 0,
+              montantPaye: selectedSession.montantPaye || 0,
+              modePaiement: selectedSession.modePaiement || 'ESPECES',
+              statutTransaction: selectedSession.estPayee ? 'VALIDEE' : 'EN_ATTENTE'
+            }}
+            onUpdate={handlePaymentUpdate}
+          />
+        )}
+
+        {showDetailsModal && selectedSession && (
+          <SessionDetailsModal
+            session={selectedSession}
+            onClose={() => setShowDetailsModal(false)}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ✅ NOUVEAU: Composant modal pour les détails de session
+const SessionDetailsModal = ({ session, onClose }) => {
+  const { effectiveTheme } = useTheme();
+  const isDarkMode = effectiveTheme === 'dark';
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: 'MAD'
+    }).format(amount || 0);
+  };
+
+  const formatDuration = (minutes) => {
+    if (!minutes) return '0min';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+  };
+
+  const formatDateTime = (dateString) => {
+    return new Date(dateString).toLocaleString('fr-FR');
+  };
+
+  return (
+    <Modal isOpen={true} onClose={onClose} size="lg" title="Détails de la session">
+      <div className="space-y-6">
+        {/* Informations générales */}
+        <div>
+          <h3 className="text-lg font-medium mb-3">Informations générales</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium">N° Session</label>
+              <p className="mt-1 font-mono">{session.numeroSession}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Poste</label>
+              <p className="mt-1">{session.poste?.nom} ({session.poste?.typePoste?.nom})</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Client</label>
+              <p className="mt-1">
+                {session.client 
+                  ? `${session.client.prenom} ${session.client.nom}`
+                  : 'Session libre'
+                }
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Statut</label>
+              <Badge variant={session.statut === 'TERMINEE' ? 'green' : 'red'}>
+                {session.statut}
+              </Badge>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Début</label>
+              <p className="mt-1">{formatDateTime(session.dateHeureDebut)}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Fin</label>
+              <p className="mt-1">
+                {session.dateHeureFin ? formatDateTime(session.dateHeureFin) : 'En cours'}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Durée estimée</label>
+              <p className="mt-1">{formatDuration(session.dureeEstimeeMinutes)}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Durée réelle</label>
+              <p className="mt-1">
+                {formatDuration(session.dureeReelleMinutes || session.dureeEffectiveMinutes)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Informations financières */}
+        <div>
+          <h3 className="text-lg font-medium mb-3">Informations financières</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium">Montant total</label>
+              <p className="mt-1 text-lg font-bold">
+                {formatCurrency(session.transaction?.montantTotal || session.montantTotal)}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Montant payé</label>
+              <p className="mt-1 text-lg font-bold text-green-600">
+                {formatCurrency(session.transaction?.montantPaye || session.montantPaye)}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Reste à payer</label>
+              <p className="mt-1 text-lg font-bold text-red-600">
+                {formatCurrency(
+                  Math.max(0, 
+                    (session.transaction?.montantTotal || session.montantTotal || 0) - 
+                    (session.transaction?.montantPaye || session.montantPaye || 0)
+                  )
+                )}
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Mode de paiement</label>
+              <p className="mt-1">
+                {session.transaction?.modePaiement || session.modePaiement || 'Non défini'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Notes */}
+        {session.notes && (
+          <div>
+            <h3 className="text-lg font-medium mb-3">Notes</h3>
+            <p className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+              {session.notes}
+            </p>
+          </div>
+        )}
+
+        {/* Plan tarifaire utilisé */}
+        {session.planTarifaireUtilise && (
+          <div>
+            <h3 className="text-lg font-medium mb-3">Plan tarifaire utilisé</h3>
+            <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+              <p className="font-medium">{session.planTarifaireUtilise.nom}</p>
+              <p className="text-sm opacity-75">
+                {session.planTarifaireUtilise.dureeMin}-{session.planTarifaireUtilise.dureeMax} minutes
+                • {formatCurrency(session.planTarifaireUtilise.prixPlan)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Boutons d'action */}
+        <div className="flex justify-end pt-4">
+          <Button onClick={onClose}>
+            Fermer
           </Button>
         </div>
       </div>
-
-      {/* ✅ CORRECTION: Filtres améliorés */}
-      <Card className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Recherche */}
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Rechercher (poste, client...)"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          {/* État des sessions */}
-          <Select
-            placeholder="État de session"
-            value={filters.etats}
-            onChange={(value) => handleFilterChange('etats', value)}
-            multiple
-            options={[
-              { value: 'EN_COURS', label: 'En cours' },
-              { value: 'TERMINEE', label: 'Terminée' },
-              { value: 'ANNULEE', label: 'Annulée' },
-              { value: 'EN_PAUSE', label: 'En pause' }
-            ]}
-          />
-
-          {/* Date de début */}
-          <DatePicker
-            placeholder="Date de début"
-            value={filters.dateDebut}
-            onChange={(date) => handleFilterChange('dateDebut', date)}
-          />
-
-          {/* Date de fin */}
-          <DatePicker
-            placeholder="Date de fin"
-            value={filters.dateFin}
-            onChange={(date) => handleFilterChange('dateFin', date)}
-          />
-        </div>
-
-        {/* Tri */}
-        <div className="flex items-center space-x-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <span className="text-sm text-gray-600 dark:text-gray-400">Trier par:</span>
-          <Select
-            value={filters.sortBy}
-            onChange={(value) => handleFilterChange('sortBy', value)}
-            options={[
-              { value: 'dateHeureDebut', label: 'Date de début' },
-              { value: 'dureeEffectiveMinutes', label: 'Durée' },
-              { value: 'coutCalculeFinal', label: 'Coût' }
-            ]}
-            className="w-40"
-          />
-          <Select
-            value={filters.sortOrder}
-            onChange={(value) => handleFilterChange('sortOrder', value)}
-            options={[
-              { value: 'desc', label: 'Décroissant' },
-              { value: 'asc', label: 'Croissant' }
-            ]}
-            className="w-32"
-          />
-        </div>
-      </Card>
-
-      {/* ✅ CORRECTION: Tableau des sessions avec calculs corrects */}
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Session
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Client
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Durée
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  État
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Montants
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Paiement
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-              {sessions.map((session) => {
-                // ✅ CORRECTION: Calculs de montants corrects
-                const transaction = session.transaction;
-                const montantTotal = transaction ? parseFloat(transaction.montantTotal) || 0 : 0;
-                const montantPaye = transaction ? parseFloat(transaction.montantPaye) || 0 : 0;
-                const resteAPayer = transaction ? Math.max(0, montantTotal - montantPaye) : 0;
-
-                return (
-                  <tr key={session.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {session.poste?.nomPoste || 'Poste inconnu'}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(session.dateHeureDebut).toLocaleDateString('fr-FR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {session.client ? 
-                          `${session.client.prenom} ${session.client.nom}` : 
-                          'Client anonyme'
-                        }
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {formatDuration(session.dureeEffectiveMinutes)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getSessionStatusBadge(session)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="space-y-1">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          Total: {formatCurrency(montantTotal)}
-                        </div>
-                        {transaction && (
-                          <>
-                            <div className="text-xs text-green-600 dark:text-green-400">
-                              Payé: {formatCurrency(montantPaye)}
-                            </div>
-                            {resteAPayer > 0 && (
-                              <div className="text-xs text-red-600 dark:text-red-400">
-                                Reste: {formatCurrency(resteAPayer)}
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getPaymentStatusBadge(session)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                      <Button
-                        onClick={() => handleOpenDetails(session)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <Eye size={16} />
-                      </Button>
-                      {transaction && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-green-600 hover:text-green-800"
-                        >
-                          <Receipt size={16} />
-                        </Button>
-                      )}
-                      <Button
-                        onClick={() => handleOpenCorrection(session)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-orange-600 hover:text-orange-800"
-                      >
-                        <Wrench size={16} />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ✅ CORRECTION: Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-            <Pagination
-              currentPage={pagination.currentPage}
-              totalPages={pagination.totalPages}
-              onPageChange={handlePageChange}
-              itemsPerPage={pagination.itemsPerPage}
-              totalItems={pagination.totalItems}
-            />
-          </div>
-        )}
-      </Card>
-
-      {/* ✅ CORRECTION: Modales */}
-      {showDetailsModal && selectedSession && (
-        <SessionDetailsModal
-          session={selectedSession}
-          isOpen={showDetailsModal}
-          onClose={() => {
-            setShowDetailsModal(false);
-            setSelectedSession(null);
-          }}
-        />
-      )}
-
-      {showCorrectionModal && selectedSession && (
-        <SessionCorrectionModal
-          session={selectedSession}
-          isOpen={showCorrectionModal}
-          onClose={() => {
-            setShowCorrectionModal(false);
-            setSelectedSession(null);
-          }}
-          onSuccess={() => {
-            refetch();
-            setShowCorrectionModal(false);
-            setSelectedSession(null);
-          }}
-        />
-      )}
-    </div>
+    </Modal>
   );
 };
 

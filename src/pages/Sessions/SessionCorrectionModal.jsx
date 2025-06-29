@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Save, AlertTriangle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Button, Input, Textarea, Select } from '../../components/ui';
+import { Button, Input, TextArea, Select } from '../../components/ui';
 
 const SessionCorrectionModal = ({ session, onClose, onCorrect }) => {
   const { effectiveTheme } = useTheme();
@@ -186,7 +186,7 @@ const SessionCorrectionModal = ({ session, onClose, onCorrect }) => {
               <label className={`block text-sm font-medium ${getTextColorClass(true)} mb-2`}>
                 Notes de session
               </label>
-              <Textarea
+              <TextArea
                 value={corrections.notes}
                 onChange={(e) => handleInputChange('notes', e.target.value)}
                 placeholder="Notes ou commentaires sur la session..."
@@ -199,7 +199,7 @@ const SessionCorrectionModal = ({ session, onClose, onCorrect }) => {
               <label className={`block text-sm font-medium ${getTextColorClass(true)} mb-2`}>
                 Raison de la correction *
               </label>
-              <Textarea
+              <TextArea
                 value={corrections.raisonCorrection}
                 onChange={(e) => handleInputChange('raisonCorrection', e.target.value)}
                 placeholder="Expliquez pourquoi cette correction est nécessaire..."

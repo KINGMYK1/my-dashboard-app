@@ -1,4 +1,26 @@
-import { api } from '../api/apiService';
+import api from '../api/apiService';
+
+// Protection contre les requêtes multiples (conservée)
+let pendingRequests = new Map();
+
+const withRequestProtection = async (key, requestFn) => {
+  if (pendingRequests.has(key)) {
+    console.log(`🚫 [SESSION_SERVICE] Requête ${key} déjà en cours, utilisation du cache`);
+    return pendingRequests.get(key);
+  }
+
+  const promise = requestFn();
+  pendingRequests.set(key, promise);
+
+  try {
+    const result = await promise;
+    return result;
+  } finally {
+    setTimeout(() => {
+      pendingRequests.delete(key);
+    }, 1000);
+  }
+};
 
 class SessionService {
   constructor() {
@@ -6,91 +28,201 @@ class SessionService {
   }
 
   /**
-   * ✅ CORRECTION: Démarrer une session avec plans tarifaires
+   * ✅ CONSERVÉ: Démarrer une session avec votre structure
    */
   async demarrerSession(sessionData) {
     try {
-      console.log('🚀 [SESSION_SERVICE] Démarrage session:', sessionData);
-      
-      // ✅ Validation côté client
-      if (!sessionData.posteId) {
-        throw new Error('ID du poste requis');
-      }
-      
-      if (!sessionData.dureeMinutes || sessionData.dureeMinutes <= 0) {
-        throw new Error('Durée en minutes requise et doit être positive');
+      // ✅ PROTECTION: Vérifier que sessionData existe et a les propriétés minimales
+      if (!sessionData || typeof sessionData !== 'object') {
+        console.error('❌ [SESSION_SERVICE] sessionData invalide:', sessionData);
+        throw new Error('Données de session invalides');
       }
 
-      // ✅ Structurer correctement les données
-      const payload = {
-        posteId: parseInt(sessionData.posteId),
-        dureeMinutes: parseInt(sessionData.dureeMinutes),
-        clientId: sessionData.clientId ? parseInt(sessionData.clientId) : null,
-        abonnementId: sessionData.abonnementId ? parseInt(sessionData.abonnementId) : null,
-        notes: sessionData.notes || '',
-        jeuPrincipal: sessionData.jeuPrincipal || '',
-        planTarifaireId: sessionData.planTarifaireId ? parseInt(sessionData.planTarifaireId) : null
+      if (!sessionData.posteId || !sessionData.dureeMinutes) {
+        console.error('❌ [SESSION_SERVICE] Propriétés manquantes:', {
+          posteId: sessionData.posteId,
+          dureeMinutes: sessionData.dureeMinutes
+        });
+        throw new Error('Poste et durée requis pour démarrer une session');
+      }
+
+      console.log('📤 [SESSION_SERVICE] Envoi données session:', {
+        posteId: sessionData?.posteId,
+        dureeMinutes: sessionData?.dureeMinutes,
+        clientId: sessionData?.clientId,
+        abonnementId: sessionData?.abonnementId,
+        dataType: typeof sessionData?.dureeMinutes,
+        sessionDataKeys: Object.keys(sessionData || {}),
+        sessionDataComplete: sessionData
+      });
+
+      const formattedData = {
+        ...sessionData,
+        dureeMinutes: parseInt(sessionData.dureeMinutes) || 60
       };
 
-      console.log('📤 [SESSION_SERVICE] Payload envoyé:', payload);
+      console.log('📤 [SESSION_SERVICE] Données formatées:', formattedData);
 
-      const response = await api.post(`${this.baseUrl}/demarrer`, payload);
+      const response = await api.post('/sessions/demarrer', formattedData);
       
-      console.log('✅ [SESSION_SERVICE] Session démarrée:', response);
+      console.log('📡 [SESSION_SERVICE] Réponse serveur:', response);
+      
+      // ✅ CORRECTION: Normaliser la session créée dans la réponse
+      console.log('🔍 [SESSION_SERVICE] Structure complète réponse:', JSON.stringify(response, null, 2));
+      console.log('🔍 [SESSION_SERVICE] response.data:', response.data);
+      console.log('🔍 [SESSION_SERVICE] response.data.data:', response.data?.data);
+      
+      if (response.data && response.data.data && typeof response.data.data === 'object') {
+        console.log('🔧 [SESSION_SERVICE] Normalisation de la session créée:', response.data.data);
+        try {
+          const normalizedSession = this.normalizeSessionData(response.data.data);
+          console.log('✅ [SESSION_SERVICE] Session normalisée:', normalizedSession);
+          
+          return {
+            ...response,
+            data: {
+              ...response.data,
+              data: normalizedSession
+            }
+          };
+        } catch (normalizeError) {
+          console.error('❌ [SESSION_SERVICE] Erreur lors de la normalisation:', normalizeError);
+          console.log('📄 [SESSION_SERVICE] Données brutes envoyées à normalizeSessionData:', response.data.data);
+          // Retourner la réponse originale en cas d'erreur de normalisation
+          return response;
+        }
+      }
+      
       return response;
     } catch (error) {
       console.error('❌ [SESSION_SERVICE] Erreur démarrage session:', error);
-      throw error;
+      
+      if (error.response?.data) {
+        throw new Error(error.response.data.message || 'Erreur lors du démarrage de la session');
+      }
+      
+      throw new Error('Erreur de connexion au serveur');
     }
   }
 
   /**
-   * ✅ NOUVEAU: Calculer le coût avec plan tarifaire
+   * ✅ CONSERVÉ: Récupérer les sessions actives avec protection
    */
-  async calculerCoutSession(posteId, dureeMinutes, options = {}) {
-    try {
-      console.log('💰 [SESSION_SERVICE] Calcul coût session:', { posteId, dureeMinutes, options });
-      
-      const payload = {
-        posteId: parseInt(posteId),
-        dureeMinutes: parseInt(dureeMinutes),
-        abonnementId: options.abonnementId ? parseInt(options.abonnementId) : null,
-        planTarifaireId: options.planTarifaireId ? parseInt(options.planTarifaireId) : null
-      };
-
-      const response = await api.post(`${this.baseUrl}/calculer-cout`, payload);
-      
-      console.log('✅ [SESSION_SERVICE] Coût calculé:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur calcul coût:', error);
-      throw error;
-    }
+  async getActiveSessions() {
+    return withRequestProtection('getActiveSessions', async () => {
+      try {
+        console.log('📡 [SESSION_SERVICE] Récupération sessions actives...');
+        const response = await api.get('/sessions/active');
+        console.log('✅ [SESSION_SERVICE] Sessions actives reçues:', response);
+        return response;
+      } catch (error) {
+        console.error('❌ [SESSION_SERVICE] Erreur sessions actives:', error);
+        throw error;
+      }
+    });
   }
 
   /**
-   * ✅ CORRECTION: Terminer une session avec gestion du paiement
+   * ✅ NOUVEAU ALIAS: Pour compatibilité avec les hooks
    */
-  async terminerSession(sessionId, optionsPaiement = {}) {
+  async getSessionsActives() {
+    return this.getActiveSessions();
+  }
+
+  /**
+   * ✅ CONSERVÉ: Récupérer les sessions en pause avec protection
+   */
+  async getPausedSessions() {
+    return withRequestProtection('getPausedSessions', async () => {
+      try {
+        console.log('📡 [SESSION_SERVICE] Récupération sessions en pause...');
+        const response = await api.get('/sessions/paused');
+        console.log('✅ [SESSION_SERVICE] Sessions en pause reçues:', response);
+        return response;
+      } catch (error) {
+        console.error('❌ [SESSION_SERVICE] Erreur sessions en pause:', error);
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * ✅ NOUVEAU ALIAS: Pour compatibilité avec les hooks
+   */
+  async getSessionsEnPause() {
+    return this.getPausedSessions();
+  }
+
+  /**
+   * ✅ CONSERVÉ: Mettre en pause une session avec protection
+   */
+  async pauseSession(sessionId, data = {}) {
+    const key = `pauseSession_${sessionId}`;
+    
+    return withRequestProtection(key, async () => {
+      try {
+        console.log(`⏸️ [SESSION_SERVICE] Mise en pause session ${sessionId}`, data);
+        
+        const id = parseInt(sessionId);
+        if (isNaN(id) || id <= 0) {
+          throw new Error(`ID de session invalide: ${sessionId}`);
+        }
+        
+        const payload = {
+          raison: data.raison || data || 'Session mise en pause',
+          notes: data.notes || ''
+        };
+        
+        const response = await api.patch(`/sessions/${id}/pause`, payload);
+        
+        console.log(`✅ [SESSION_SERVICE] Session ${sessionId} mise en pause`);
+        return response;
+      } catch (error) {
+        console.error(`❌ [SESSION_SERVICE] Erreur pause session ${sessionId}:`, error);
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * ✅ CONSERVÉ: Reprendre une session avec protection
+   */
+  async resumeSession(sessionId) {
+    const key = `resumeSession_${sessionId}`;
+    
+    return withRequestProtection(key, async () => {
+      try {
+        console.log(`▶️ [SESSION_SERVICE] Reprise session ${sessionId}`);
+        
+        const id = parseInt(sessionId);
+        if (isNaN(id) || id <= 0) {
+          throw new Error(`ID de session invalide: ${sessionId}`);
+        }
+        
+        const response = await api.patch(`/sessions/${id}/reprendre`);
+        
+        console.log(`✅ [SESSION_SERVICE] Session ${sessionId} reprise`);
+        return response;
+      } catch (error) {
+        console.error(`❌ [SESSION_SERVICE] Erreur reprise session ${sessionId}:`, error);
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * ✅ CONSERVÉ: Terminer une session
+   */
+  async endSession(sessionId, sessionEndData = {}) {
     try {
-      console.log('🛑 [SESSION_SERVICE] Terminaison session:', sessionId, optionsPaiement);
+      console.log('🏁 [SESSION_SERVICE] Fin session:', sessionId, sessionEndData);
       
       const id = parseInt(sessionId);
       if (isNaN(id) || id <= 0) {
         throw new Error(`ID de session invalide: ${sessionId}`);
       }
 
-      // ✅ Structurer les options de paiement
-      const payload = {
-        modePaiement: optionsPaiement.modePaiement || 'ESPECES',
-        montantPaye: parseFloat(optionsPaiement.montantPaye) || 0,
-        marquerCommePayee: Boolean(optionsPaiement.marquerCommePayee),
-        notes: optionsPaiement.notes || ''
-      };
-
-      console.log('📤 [SESSION_SERVICE] Options paiement:', payload);
-
-      const response = await api.patch(`${this.baseUrl}/${id}/terminer`, payload);
+      const response = await api.patch(`/sessions/${id}/terminer`, sessionEndData);
       
       console.log('✅ [SESSION_SERVICE] Session terminée:', response);
       return response;
@@ -100,128 +232,28 @@ class SessionService {
     }
   }
 
-  // ✅ CORRECTION: Actions simples avec validation d'ID
-  async pauseSession(sessionId) {
-    try {
-      console.log('⏸️ [SESSION_SERVICE] Mise en pause session:', sessionId);
-      
-      // ✅ VALIDATION STRICTE DE L'ID
-      const id = parseInt(sessionId);
-      if (isNaN(id) || id <= 0) {
-        throw new Error(`ID de session invalide: ${sessionId}`);
-      }
-      
-      const response = await api.patch(`${this.baseUrl}/${id}/pause`);
-      
-      console.log('✅ [SESSION_SERVICE] Session mise en pause:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur pause session:', error);
-      throw error;
-    }
-  }
-
   /**
-   * ✅ NOUVEAU: Pause avec raison
+   * ✅ NOUVEAU ALIAS: Pour compatibilité avec les hooks
    */
-  async pauseSessionWithReason(sessionId, data) {
-    try {
-      console.log('⏸️ [SESSION_SERVICE] Mise en pause avec raison:', sessionId, data);
-      
-      const id = parseInt(sessionId);
-      if (isNaN(id) || id <= 0) {
-        throw new Error(`ID de session invalide: ${sessionId}`);
-      }
-      
-      const payload = {
-        raison: data.raison || '',
-        notes: data.notes || ''
-      };
-      
-      const response = await api.patch(`${this.baseUrl}/${id}/pause`, payload);
-      
-      console.log('✅ [SESSION_SERVICE] Session mise en pause avec raison:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur pause avec raison:', error);
-      throw error;
-    }
-  }
-
-  async resumeSession(sessionId) {
-    try {
-      console.log('▶️ [SESSION_SERVICE] Reprise session:', sessionId);
-      
-      const id = parseInt(sessionId);
-      if (isNaN(id) || id <= 0) {
-        throw new Error(`ID de session invalide: ${sessionId}`);
-      }
-      
-      const response = await api.patch(`${this.baseUrl}/${id}/reprendre`);
-      
-      console.log('✅ [SESSION_SERVICE] Session reprise:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur reprise session:', error);
-      throw error;
-    }
+  async terminerSession(sessionId, options = {}) {
+    return this.endSession(sessionId, options);
   }
 
   /**
-   * ✅ CORRECTION: Annuler une session
-   */
-  async cancelSession(sessionId, raison) {
-    try {
-      console.log('❌ [SESSION_SERVICE] Annulation session:', sessionId, raison);
-      
-      if (!raison || !raison.trim()) {
-        throw new Error('Raison d\'annulation requise');
-      }
-
-      const response = await api.patch(`${this.baseUrl}/${parseInt(sessionId)}/annuler`, {
-        raison: raison.trim()
-      });
-      
-      console.log('✅ [SESSION_SERVICE] Session annulée:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur annulation session:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * ✅ CORRECTION: Prolonger une session avec logs détaillés
+   * ✅ CONSERVÉ: Prolonger une session avec validation stricte
    */
   async extendSession(sessionId, dureeSupplementaireMinutes) {
     try {
-      console.log('➕ [SESSION_SERVICE] DÉBUT extendSession:', {
-        sessionId: sessionId,
-        dureeSupplementaireMinutes: dureeSupplementaireMinutes,
-        sessionIdType: typeof sessionId,
-        dureeType: typeof dureeSupplementaireMinutes,
-        parametres: arguments
-      });
+      console.log('➕ [SESSION_SERVICE] Prolonger session:', sessionId, 'minutes:', dureeSupplementaireMinutes);
       
-      // ✅ VALIDATION STRICTE DE L'ID
       const id = parseInt(sessionId);
       if (isNaN(id) || id <= 0) {
-        throw new Error(`ID de session invalide: ${sessionId} (type: ${typeof sessionId})`);
+        throw new Error(`ID de session invalide: ${sessionId}`);
       }
-
-      // ✅ VALIDATION STRICTE DE LA DURÉE AVEC LOGS DÉTAILLÉS
-      console.log('🔍 [SESSION_SERVICE] Validation durée:', {
-        valueReceived: dureeSupplementaireMinutes,
-        typeReceived: typeof dureeSupplementaireMinutes,
-        isUndefined: dureeSupplementaireMinutes === undefined,
-        isNull: dureeSupplementaireMinutes === null,
-        isNaN: isNaN(dureeSupplementaireMinutes),
-        parseInt: parseInt(dureeSupplementaireMinutes)
-      });
 
       const duree = parseInt(dureeSupplementaireMinutes);
       if (isNaN(duree) || duree <= 0) {
-        throw new Error(`Durée supplémentaire invalide: ${dureeSupplementaireMinutes} (reçu: ${typeof dureeSupplementaireMinutes}, parsé: ${duree})`);
+        throw new Error(`Durée supplémentaire invalide: ${dureeSupplementaireMinutes}`);
       }
 
       if (duree > 240) {
@@ -232,103 +264,83 @@ class SessionService {
         dureeSupplementaireMinutes: duree
       };
 
-      console.log('📤 [SESSION_SERVICE] Payload prolongation FINAL:', payload);
-
-      const response = await api.patch(`${this.baseUrl}/${id}/prolonger`, payload);
+      const response = await api.patch(`/sessions/${id}/prolonger`, payload);
       
-      console.log('✅ [SESSION_SERVICE] Session prolongée avec succès:', response);
+      console.log('✅ [SESSION_SERVICE] Session prolongée:', response);
       return response;
     } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur prolongation session:', {
-        error: error,
-        message: error.message,
-        stack: error.stack,
-        parametres: { sessionId, dureeSupplementaireMinutes }
-      });
+      console.error('❌ [SESSION_SERVICE] Erreur prolongation session:', error);
       throw error;
     }
   }
 
   /**
-   * ✅ CORRECTION: Récupérer les sessions actives
+   * ✅ CONSERVÉ: Annuler une session
    */
-  async getSessionsActives() {
+  async cancelSession(sessionId, raison) {
     try {
-      console.log('📋 [SESSION_SERVICE] Récupération sessions actives');
+      console.log('❌ [SESSION_SERVICE] Annuler session:', sessionId, 'raison:', raison);
       
-      const response = await api.get(`${this.baseUrl}/active`);
+      if (!raison || !raison.trim()) {
+        throw new Error('Raison d\'annulation requise');
+      }
+
+      const id = parseInt(sessionId);
+      if (isNaN(id) || id <= 0) {
+        throw new Error(`ID de session invalide: ${sessionId}`);
+      }
+
+      const response = await api.patch(`/sessions/${id}/annuler`, { raison: raison.trim() });
       
-      console.log('✅ [SESSION_SERVICE] Sessions actives récupérées:', response);
+      console.log('✅ [SESSION_SERVICE] Session annulée:', response);
       return response;
     } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur récupération sessions actives:', error);
+      console.error('❌ [SESSION_SERVICE] Erreur annulation session:', error);
       throw error;
     }
   }
 
   /**
-   * ✅ NOUVEAU: Récupérer les sessions en pause
+   * ✅ CONSERVÉ: Calculer le prix d'une session
    */
-  async getSessionsEnPause() {
+  async calculateSessionPrice(data) {
     try {
-      console.log('📋 [SESSION_SERVICE] Récupération sessions en pause');
+      console.log('💰 [SESSION_SERVICE] Calcul prix session:', data);
       
-      const response = await api.get(`${this.baseUrl}/paused`);
+      const payload = {
+        posteId: parseInt(data.posteId),
+        dureeMinutes: parseInt(data.dureeMinutes),
+        abonnementId: data.abonnementId ? parseInt(data.abonnementId) : null,
+        planTarifaireId: data.planTarifaireId ? parseInt(data.planTarifaireId) : null
+      };
+
+      const response = await api.post('/sessions/calculer-cout', payload);
       
-      console.log('✅ [SESSION_SERVICE] Sessions en pause récupérées:', response);
+      console.log('✅ [SESSION_SERVICE] Coût calculé:', response);
       return response;
     } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur récupération sessions en pause:', error);
+      console.error('❌ [SESSION_SERVICE] Erreur calcul coût:', error);
       throw error;
     }
   }
 
   /**
-   * ✅ CORRECTION: Récupérer une session par ID
+   * ✅ NOUVEAU ALIAS: Pour compatibilité
    */
-  async getSessionById(sessionId) {
-    try {
-      console.log('🔍 [SESSION_SERVICE] Récupération session par ID:', sessionId);
-      
-      const response = await api.get(`${this.baseUrl}/${parseInt(sessionId)}`);
-      
-      console.log('✅ [SESSION_SERVICE] Session récupérée:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur récupération session:', error);
-      throw error;
-    }
+  async calculerPrixSession(data) {
+    return this.calculateSessionPrice(data);
   }
 
   /**
-   * ✅ NOUVEAU: Récupérer les détails complets d'une session
+   * ✅ CONSERVÉ: Récupérer l'historique des sessions
    */
-  async getSessionDetails(sessionId) {
+  async getSessionsHistory(filters = {}) {
     try {
-      console.log('🔍 [SESSION_SERVICE] Récupération détails session:', sessionId);
+      console.log('📋 [SESSION_SERVICE] Récupération historique sessions:', filters);
       
-      const response = await api.get(`${this.baseUrl}/${parseInt(sessionId)}/details`);
-      
-      console.log('✅ [SESSION_SERVICE] Détails session récupérés:', response);
-      return response;
-    } catch (error) {
-      console.error('❌ [SESSION_SERVICE] Erreur récupération détails:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * ✅ CORRECTION: Récupérer l'historique avec filtres améliorés
-   */
-  async getHistoriqueSessions(filtres = {}) {
-    try {
-      console.log('📋 [SESSION_SERVICE] Récupération historique avec filtres:', filtres);
-      
-      // ✅ Construction des paramètres avec gestion des arrays
       const params = new URLSearchParams();
-      
-      Object.entries(filtres).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== '') {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
           if (Array.isArray(value)) {
             value.forEach(v => {
               if (v !== null && v !== undefined && v !== '') {
@@ -341,7 +353,7 @@ class SessionService {
         }
       });
 
-      const response = await api.get(`${this.baseUrl}/historique?${params.toString()}`);
+      const response = await api.get(`/sessions/historique?${params.toString()}`);
       
       console.log('✅ [SESSION_SERVICE] Historique récupéré:', response);
       return response;
@@ -352,17 +364,24 @@ class SessionService {
   }
 
   /**
-   * ✅ NOUVEAU: Récupérer les statistiques d'un poste
+   * ✅ NOUVEAU ALIAS: Pour compatibilité avec les hooks
    */
-  async getStatistiquesPoste(posteId, options = {}) {
+  async getHistoriqueSessions(filters = {}) {
+    return this.getSessionsHistory(filters);
+  }
+
+  /**
+   * ✅ CONSERVÉ: Récupérer les statistiques d'un poste
+   */
+  async getPosteStatistics(posteId, options = {}) {
     try {
-      console.log('📊 [SESSION_SERVICE] Récupération stats poste:', posteId, options);
+      console.log('📊 [SESSION_SERVICE] Récupération statistiques poste:', posteId, options);
       
       const params = new URLSearchParams();
       if (options.dateDebut) params.append('dateDebut', options.dateDebut);
       if (options.dateFin) params.append('dateFin', options.dateFin);
       
-      const response = await api.get(`${this.baseUrl}/poste/${parseInt(posteId)}/statistics?${params.toString()}`);
+      const response = await api.get(`/sessions/poste/${parseInt(posteId)}/statistics?${params.toString()}`);
       
       console.log('✅ [SESSION_SERVICE] Stats poste récupérées:', response);
       return response;
@@ -373,7 +392,128 @@ class SessionService {
   }
 
   /**
-   * ✅ NOUVEAU: Normaliser les données de session pour l'affichage
+   * ✅ NOUVEAU: Traiter un paiement de session
+   */
+  async processSessionPayment(sessionId, paymentData) {
+    try {
+      console.log('💳 [SESSION_SERVICE] Traitement paiement session:', sessionId, paymentData);
+      
+      const id = parseInt(sessionId);
+      if (isNaN(id) || id <= 0) {
+        throw new Error(`ID de session invalide: ${sessionId}`);
+      }
+
+      const payload = {
+        modePaiement: paymentData.modePaiement,
+        montantPaye: parseFloat(paymentData.montantPaye) || 0,
+        notes: paymentData.notes || '',
+        marquerCommePayee: Boolean(paymentData.marquerCommePayee)
+      };
+
+      const response = await api.post(`/sessions/${id}/paiement`, payload);
+      
+      console.log('✅ [SESSION_SERVICE] Paiement traité:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ [SESSION_SERVICE] Erreur traitement paiement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Payer une session (alias)
+   */
+  async payerSession(sessionId, paiementData) {
+    return this.processSessionPayment(sessionId, paiementData);
+  }
+
+  /**
+   * ✅ NOUVEAU: Corriger une session
+   */
+  async correctionSession(sessionId, correctionData) {
+    try {
+      console.log('🔧 [SESSION_SERVICE] Correction session:', sessionId, correctionData);
+      
+      const id = parseInt(sessionId);
+      if (isNaN(id) || id <= 0) {
+        throw new Error(`ID de session invalide: ${sessionId}`);
+      }
+
+      const response = await api.patch(`/sessions/${id}/correction`, correctionData);
+      
+      console.log('✅ [SESSION_SERVICE] Session corrigée:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ [SESSION_SERVICE] Erreur correction session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Récupérer une session par ID
+   */
+  async getSessionById(sessionId) {
+    try {
+      console.log('🔍 [SESSION_SERVICE] Récupération session par ID:', sessionId);
+      
+      const id = parseInt(sessionId);
+      if (isNaN(id) || id <= 0) {
+        throw new Error(`ID de session invalide: ${sessionId}`);
+      }
+
+      const response = await api.get(`/sessions/${id}`);
+      
+      console.log('✅ [SESSION_SERVICE] Session récupérée:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ [SESSION_SERVICE] Erreur récupération session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Récupérer les statistiques de sessions
+   */
+  async getSessionStatistics(filters = {}) {
+    try {
+      console.log('📊 [SESSION_SERVICE] Récupération statistiques sessions:', filters);
+      
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value);
+        }
+      });
+
+      const response = await api.get(`/sessions/statistics?${params.toString()}`);
+      
+      console.log('✅ [SESSION_SERVICE] Statistiques récupérées:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ [SESSION_SERVICE] Erreur récupération statistiques:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Récupérer les plans tarifaires
+   */
+  async getPlansTarifaires() {
+    try {
+      console.log('💰 [SESSION_SERVICE] Récupération plans tarifaires');
+      
+      const response = await api.get('/plans-tarifaires');
+      
+      console.log('✅ [SESSION_SERVICE] Plans tarifaires récupérés:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ [SESSION_SERVICE] Erreur récupération plans tarifaires:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ CONSERVÉ: Normaliser les données de session
    */
   normalizeSessionData(session) {
     if (!session || typeof session !== 'object') {
@@ -390,11 +530,14 @@ class SessionService {
       dureeReelleMinutes: session.dureeReelleMinutes || session.dureeEffectiveMinutes || 0,
       tempsPauseTotalMinutes: session.tempsPauseTotalMinutes || 0,
       
-      // ✅ NOUVEAU: Informations de tarification
+      // ✅ AJOUT: posteId extrait des relations
+      posteId: session.posteId || session.poste?.id || session.Poste?.id,
+      
+      // Informations de tarification
       montantTotal: parseFloat(session.montantTotal || session.coutCalculeFinal || 0),
       montantPaye: parseFloat(session.montantPaye || 0),
       resteAPayer: parseFloat(session.resteAPayer || 0),
-      estPayee: Boolean(session.estPayee),
+      estPayee: session.estPayee === true || session.estPayee === 'true',
       modePaiement: session.modePaiement || null,
       typeCalcul: session.typeCalcul || 'TARIF_LIBRE',
       planTarifaireUtilise: session.planTarifaireUtilise || null,
@@ -429,5 +572,35 @@ class SessionService {
   }
 }
 
-export const sessionService = new SessionService();
+// ✅ EXPORT UNIFIÉ FINAL - Compatible avec tous les styles d'import
+const sessionService = new SessionService();
+
 export default sessionService;
+export { sessionService };
+
+// ✅ EXPORTS INDIVIDUELS pour compatibilité totale
+export const {
+  demarrerSession,
+  getActiveSessions,
+  getSessionsActives,
+  getPausedSessions,
+  getSessionsEnPause,
+  pauseSession,
+  resumeSession,
+  endSession,
+  terminerSession,
+  extendSession,
+  cancelSession,
+  calculateSessionPrice,
+  calculerPrixSession,
+  getSessionsHistory,
+  getHistoriqueSessions,
+  getPosteStatistics,
+  processSessionPayment,
+  payerSession,
+  correctionSession,
+  getSessionById,
+  getSessionStatistics,
+  getPlansTarifaires,
+  normalizeSessionData
+} = sessionService;

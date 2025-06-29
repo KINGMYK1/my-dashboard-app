@@ -12,7 +12,6 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { 
   useSessionsActives,
   useSessionsEnPause,
-  useDemarrerSession,
   useTerminerSession,
   usePauseSession,
   useResumeSession,
@@ -30,6 +29,10 @@ import SessionActionsModal from './SessionActionsModal';
 import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import SessionSettings from '../../components/Settings/SessionSettings';
 
+import StartSessionModal from '../../components/Sessions/StartSessionModal';
+import SimpleEndSessionModal from '../../components/Sessions/SimpleEndSessionModal';
+import SessionPaymentModal from '../../components/Sessions/SessionPaymentModal';
+
 const Sessions = () => {
   const { effectiveTheme } = useTheme();
   const { translations } = useLanguage();
@@ -39,7 +42,11 @@ const Sessions = () => {
   // ✅ États avec gestion de démontage
   const [activeTab, setActiveTab] = useState('postes');
   const [showStartForm, setShowStartForm] = useState(false);
+  const [showStartModal, setShowStartModal] = useState(false);
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPoste, setSelectedPoste] = useState(null);
+  const [selectedSession, setSelectedSession] = useState(null);
   const [selectedSessionForActions, setSelectedSessionForActions] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -47,7 +54,6 @@ const Sessions = () => {
   const isDarkMode = effectiveTheme === 'dark';
 
   // ✅ Mutations pour les actions de session (déclarées avant utilisation)
-  const demarrerSessionMutation = useDemarrerSession();
   const terminerSessionMutation = useTerminerSession();
   const pauseSessionMutation = usePauseSession();
   const resumeSessionMutation = useResumeSession();
@@ -312,6 +318,26 @@ const Sessions = () => {
     setSelectedSessionForActions(session);
   }, [isMounted]);
 
+  const handleEndSession = useCallback((session) => {
+    if (!isMounted) {
+      console.warn('⚠️ [SESSIONS] Tentative d\'action sur composant démonté');
+      return;
+    }
+    console.log('🛑 [SESSIONS] Fin de session:', session);
+    setSelectedSession(session);
+    setShowEndModal(true);
+  }, [isMounted]);
+
+  const handlePaySession = useCallback((session) => {
+    if (!isMounted) {
+      console.warn('⚠️ [SESSIONS] Tentative d\'action sur composant démonté');
+      return;
+    }
+    console.log('💰 [SESSIONS] Paiement de session:', session);
+    setSelectedSession(session);
+    setShowPaymentModal(true);
+  }, [isMounted]);
+
   // ✅ Gestionnaire de démarrage de session
   const handleSessionStarted = useCallback(async (sessionData, poste) => {
     if (!isMounted) {
@@ -319,13 +345,12 @@ const Sessions = () => {
       return;
     }
 
-    console.log('🚀 [SESSIONS] Démarrage session:', sessionData, poste);
+    console.log('✅ [SESSIONS] Session démarrée avec succès:', sessionData, poste);
     
     try {
-      await demarrerSessionMutation.mutateAsync(sessionData);
-      
+      // La session a déjà été créée par SessionStartForm, on met juste à jour l'UI
       if (isMounted) {
-        showSuccess(`Session démarrée sur ${poste.nom}`, {
+        showSuccess(`Session démarrée sur ${poste?.nom || 'poste'}`, {
           title: 'Session créée',
           duration: 3000
         });
@@ -336,13 +361,12 @@ const Sessions = () => {
       }
       
     } catch (error) {
-      console.error('❌ [SESSIONS] Erreur démarrage session:', error);
+      console.error('❌ [SESSIONS] Erreur post-démarrage:', error);
       if (isMounted) {
-        showError(error.message || 'Erreur lors du démarrage de la session');
+        showError(error.message || 'Erreur lors de la mise à jour');
       }
-      throw error;
     }
-  }, [isMounted, demarrerSessionMutation, showSuccess, showError, refetchActives, refetchPostes]);
+  }, [isMounted, showSuccess, showError, refetchActives, refetchPostes]);
 
   // ✅ Gestionnaire d'actions de session
   const handleSessionAction = useCallback(async (action, sessionId, additionalData = {}) => {
@@ -719,6 +743,48 @@ const Sessions = () => {
           }}
         />
       )}
+
+      <StartSessionModal
+        isOpen={showStartModal}
+        onClose={() => {
+          setShowStartModal(false);
+          setSelectedPoste(null);
+        }}
+        poste={selectedPoste}
+        onSessionStarted={() => {
+          setShowStartModal(false);
+          setSelectedPoste(null);
+          // Rafraîchir les données
+        }}
+      />
+
+      <SimpleEndSessionModal
+        isOpen={showEndModal}
+        onClose={() => {
+          setShowEndModal(false);
+          setSelectedSession(null);
+        }}
+        session={selectedSession}
+        onSessionEnded={() => {
+          setShowEndModal(false);
+          setSelectedSession(null);
+          // Rafraîchir les données
+        }}
+      />
+
+      <SessionPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedSession(null);
+        }}
+        session={selectedSession}
+        onPaymentComplete={() => {
+          setShowPaymentModal(false);
+          setSelectedSession(null);
+          // Rafraîchir les données
+        }}
+      />
     </div>
   );
 };

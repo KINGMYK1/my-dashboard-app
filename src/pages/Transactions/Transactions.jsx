@@ -33,6 +33,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import PaymentUpdateModal from './PaymentUpdateModal';
+import TransactionManagementModal from '../../components/Transactions/TransactionManagementModal';
 
 const Transactions = () => {
   const { effectiveTheme } = useTheme();
@@ -60,6 +61,7 @@ const Transactions = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showManagementModal, setShowManagementModal] = useState(false);
 
   // Hooks de données
   const { 
@@ -141,6 +143,11 @@ const Transactions = () => {
     } catch (error) {
       // Erreur gérée par le hook
     }
+  };
+
+  const handleManageTransaction = (transaction) => {
+    setSelectedTransaction(transaction);
+    setShowManagementModal(true);
   };
 
   const formatCurrency = (amount) => {
@@ -464,6 +471,13 @@ const Transactions = () => {
                                 <Trash2 size={14} className="inline mr-2" />
                                 Supprimer
                               </button>
+
+                              <button
+                                onClick={() => handleManageTransaction(transaction)}
+                                className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600"
+                              >
+                                Gérer
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -488,6 +502,20 @@ const Transactions = () => {
         onUpdate={handleUpdatePayment}
         loading={updatePaymentMutation.isLoading}
         formatCurrency={formatCurrency}
+      />
+
+      {/* Modal de gestion avancée */}
+      <TransactionManagementModal
+        isOpen={showManagementModal}
+        onClose={() => {
+          setShowManagementModal(false);
+          setSelectedTransaction(null);
+        }}
+        transaction={selectedTransaction}
+        onUpdate={() => {
+          // Rafraîchir les données
+          refetchTransactions();
+        }}
       />
     </div>
   );

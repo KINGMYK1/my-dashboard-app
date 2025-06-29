@@ -1,52 +1,53 @@
 import React from 'react';
 import {
-  LineChart, Line, AreaChart, Area, BarChart, Bar,
-  PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
 } from 'recharts';
 
-const COLORS = [
-  '#0088FE', '#00C49F', '#FFBB28', '#FF8042', 
-  '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'
-];
-
-const StatistiquesChart = ({ 
-  data, 
-  type = 'line', 
-  dataKey, 
-  xAxisKey = 'name', 
+const StatistiquesChart = ({
+  data = [],
+  type = 'line',
+  dataKey = 'value',
+  xAxisKey = 'name',
   nameKey = 'name',
   height = 300,
-  showGrid = true,
-  showLegend = true,
-  colors = COLORS,
-  formatValue = null
+  showLegend = false,
+  colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#8dd1e1']
 }) => {
-  
   const formatCurrency = (value) => {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat('fr-MA', {
       style: 'currency',
       currency: 'MAD',
       minimumFractionDigits: 0
-    }).format(value || 0);
+    }).format(value);
   };
-
-  const formatNumber = (value) => {
-    return new Intl.NumberFormat('fr-FR').format(value || 0);
-  };
-
-  const defaultFormatter = formatValue || ((value) => 
-    typeof value === 'number' && value > 1000 ? formatCurrency(value) : formatNumber(value)
-  );
 
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white dark:bg-gray-800 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-          <p className="font-medium text-gray-900 dark:text-white mb-2">{label}</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-white">
+            {label}
+          </p>
           {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }} className="text-sm">
-              {`${entry.name}: ${defaultFormatter(entry.value)}`}
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {typeof entry.value === 'number' && entry.value > 1000 
+                ? formatCurrency(entry.value)
+                : entry.value
+              }
             </p>
           ))}
         </div>
@@ -60,9 +61,9 @@ const StatistiquesChart = ({
       case 'line':
         return (
           <LineChart data={data}>
-            {showGrid && <CartesianGrid strokeDasharray="3 3" />}
+            <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey={xAxisKey} />
-            <YAxis tickFormatter={defaultFormatter} />
+            <YAxis tickFormatter={formatCurrency} />
             <Tooltip content={<CustomTooltip />} />
             {showLegend && <Legend />}
             <Line 
@@ -70,8 +71,7 @@ const StatistiquesChart = ({
               dataKey={dataKey} 
               stroke={colors[0]} 
               strokeWidth={2}
-              dot={{ fill: colors[0], strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6 }}
+              dot={{ fill: colors[0] }}
             />
           </LineChart>
         );
@@ -79,9 +79,9 @@ const StatistiquesChart = ({
       case 'area':
         return (
           <AreaChart data={data}>
-            {showGrid && <CartesianGrid strokeDasharray="3 3" />}
+            <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey={xAxisKey} />
-            <YAxis tickFormatter={defaultFormatter} />
+            <YAxis tickFormatter={formatCurrency} />
             <Tooltip content={<CustomTooltip />} />
             {showLegend && <Legend />}
             <Area 
@@ -97,9 +97,9 @@ const StatistiquesChart = ({
       case 'bar':
         return (
           <BarChart data={data}>
-            {showGrid && <CartesianGrid strokeDasharray="3 3" />}
+            <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey={xAxisKey} />
-            <YAxis tickFormatter={defaultFormatter} />
+            <YAxis tickFormatter={formatCurrency} />
             <Tooltip content={<CustomTooltip />} />
             {showLegend && <Legend />}
             <Bar dataKey={dataKey} fill={colors[0]} />
@@ -124,36 +124,20 @@ const StatistiquesChart = ({
                 <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
             </Pie>
-            <Tooltip 
-              formatter={(value) => [defaultFormatter(value), '']}
-              labelFormatter={(label) => `${label}`}
-            />
+            <Tooltip content={<CustomTooltip />} />
             {showLegend && <Legend />}
           </PieChart>
         );
 
       default:
-        return <div className="text-center text-gray-500">Type de graphique non supporté</div>;
+        return <div>Type de graphique non supporté</div>;
     }
   };
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
-        <div className="text-center">
-          <div className="text-4xl mb-2">📊</div>
-          <p>Aucune donnée à afficher</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full" style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        {renderChart()}
-      </ResponsiveContainer>
-    </div>
+    <ResponsiveContainer width="100%" height={height}>
+      {renderChart()}
+    </ResponsiveContainer>
   );
 };
 

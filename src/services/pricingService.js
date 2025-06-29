@@ -1,94 +1,80 @@
+import api from '../api/apiService';
+
 class PricingService {
   /**
-   * Calculer le prix basé sur les plans tarifaires
+   * ✅ CALCUL DU PRIX ESTIMÉ D'UNE SESSION
    */
-  static calculateSessionPrice(typePoste, dureeEstimeeMinutes) {
-    if (!typePoste || !dureeEstimeeMinutes) {
-      return {
-        prix: 0,
-        planUtilise: null,
-        typeTarif: 'AUCUN',
-        dureeFacturee: dureeEstimeeMinutes
-      };
-    }
+  static async calculerPrixEstime(posteId, dureeMinutes = 60, abonnementId = null) {
+    try {
+      console.log(`💰 [PRICING] Calcul prix estimé - Poste: ${posteId}, Durée: ${dureeMinutes}min`);
 
-    // Récupérer les plans tarifaires actifs du type de poste
-    const plansActifs = typePoste.plansTarifaires?.filter(plan => plan.estActif) || [];
-    
-    if (plansActifs.length === 0) {
-      // Fallback sur le tarif horaire de base
-      const prixHoraire = parseFloat(typePoste.tarifHoraireBase) || 0;
-      const heures = dureeEstimeeMinutes / 60;
-      return {
-        prix: parseFloat((prixHoraire * heures).toFixed(2)),
-        planUtilise: null,
-        typeTarif: 'HORAIRE',
-        dureeFacturee: dureeEstimeeMinutes
-      };
-    }
-
-    // Trouver le meilleur plan pour la durée estimée
-    const planOptimal = this.findOptimalPlan(plansActifs, dureeEstimeeMinutes);
-    
-    return {
-      prix: parseFloat(planOptimal.prix),
-      planUtilise: planOptimal,
-      typeTarif: 'FORFAIT',
-      dureeFacturee: planOptimal.dureeMinutes
-    };
-  }
-
-  /**
-   * Trouver le plan optimal pour une durée donnée
-   */
-  static findOptimalPlan(plans, dureeMinutes) {
-    // Trier les plans par durée croissante
-    const plansTries = plans.sort((a, b) => a.dureeMinutes - b.dureeMinutes);
-    
-    // Trouver le plan qui couvre exactement ou dépasse légèrement la durée
-    let planOptimal = plansTries.find(plan => plan.dureeMinutes >= dureeMinutes);
-    
-    // Si aucun plan ne couvre la durée, prendre le plus grand
-    if (!planOptimal) {
-      planOptimal = plansTries[plansTries.length - 1];
-    }
-    
-    return planOptimal;
-  }
-
-  /**
-   * Calculer les options de paiement disponibles
-   */
-  static getPaymentOptions(typePoste, dureeEstimeeMinutes) {
-    const plansActifs = typePoste.plansTarifaires?.filter(plan => plan.estActif) || [];
-    
-    const options = plansActifs.map(plan => ({
-      id: plan.id,
-      nom: plan.nom,
-      dureeMinutes: plan.dureeMinutes,
-      prix: plan.prix,
-      description: plan.description,
-      prixParMinute: (plan.prix / plan.dureeMinutes).toFixed(3),
-      recommande: plan.dureeMinutes >= dureeEstimeeMinutes && 
-                  plan.dureeMinutes <= dureeEstimeeMinutes * 1.5
-    }));
-
-    // Ajouter l'option tarif horaire si disponible
-    if (typePoste.tarifHoraireBase > 0) {
-      const prixHoraire = parseFloat(typePoste.tarifHoraireBase);
-      const heures = dureeEstimeeMinutes / 60;
-      options.push({
-        id: 'horaire',
-        nom: 'Tarif horaire',
-        dureeMinutes: dureeEstimeeMinutes,
-        prix: parseFloat((prixHoraire * heures).toFixed(2)),
-        description: `${prixHoraire} MAD/heure`,
-        prixParMinute: (prixHoraire / 60).toFixed(3),
-        recommande: false
+      const response = await api.post('/sessions/calculer-prix', {
+        posteId,
+        dureeMinutes,
+        abonnementId
       });
-    }
 
-    return options.sort((a, b) => b.recommande - a.recommande || a.prix - b.prix);
+      console.log('✅ [PRICING] Prix calculé:', response);
+      return response;
+
+    } catch (error) {
+      console.error('❌ [PRICING] Erreur calcul prix:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ VÉRIFIER LE STATUT DE PAIEMENT D'UNE SESSION
+   */
+  static async verifierStatutPaiement(sessionId) {
+    try {
+      const response = await api.get(`/sessions/${sessionId}/paiement/statut`);
+      return response;
+    } catch (error) {
+      console.error('❌ [PRICING] Erreur vérification paiement:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ CALCULER LE PRIX FINAL D'UNE SESSION TERMINÉE
+   */
+  static async calculerPrixFinal(sessionId) {
+    try {
+      console.log(`💰 [PRICING_SERVICE] Calcul prix final pour session ${sessionId}`);
+      const response = await api.post(`/sessions/${sessionId}/calculer-prix-final`);
+      console.log('✅ [PRICING_SERVICE] Réponse prix final:', response);
+      console.log('📊 [PRICING_SERVICE] Données reçues:', response.data);
+      return response.data; // Retourner response.data au lieu de response
+    } catch (error) {
+      console.error('❌ [PRICING] Erreur calcul prix final:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ FORMATER UNE DEVISE
+   */
+  static formatCurrency(amount, currency = 'MAD') {
+    return new Intl.NumberFormat('fr-MA', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2
+    }).format(amount || 0);
+  }
+
+  /**
+   * ✅ FORMATER UNE DURÉE
+   */
+  static formatDuree(minutes) {
+    if (!minutes || minutes < 0) return '0 min';
+    
+    const heures = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (heures === 0) return `${mins} min`;
+    if (mins === 0) return `${heures}h`;
+    return `${heures}h ${mins.toString().padStart(2, '0')}min`;
   }
 }
 

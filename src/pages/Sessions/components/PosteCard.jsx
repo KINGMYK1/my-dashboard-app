@@ -17,6 +17,38 @@ import {
 const PosteCard = ({ poste, activeSession, onStartSession, onOpenSessionActions, isDarkMode }) => {
   const [currentTime, setCurrentTime] = useState(Date.now());
 
+  // ✅ AJOUT: Fonctions utilitaires pour l'affichage des montants et statuts
+  const formatMontant = (montant) => {
+    if (montant === null || montant === undefined) return '0.00';
+    return parseFloat(montant).toFixed(2);
+  };
+
+  const getStatutPaiementBadge = (statutPaiement) => {
+    const baseClasses = "px-2 py-1 rounded text-xs font-medium";
+    
+    switch (statutPaiement) {
+      case 'PAYEE':
+        return (
+          <span className={`${baseClasses} bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400`}>
+            ✅ Payée
+          </span>
+        );
+      case 'PARTIELLE':
+        return (
+          <span className={`${baseClasses} bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400`}>
+            ⚠️ Partielle
+          </span>
+        );
+      case 'IMPAYEE':
+      default:
+        return (
+          <span className={`${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400`}>
+            ❌ Impayée
+          </span>
+        );
+    }
+  };
+
   // ✅ CORRECTION: Timer seulement pour les sessions EN_COURS
   useEffect(() => {
     if (activeSession && activeSession.statut === 'EN_COURS') {
@@ -41,7 +73,9 @@ const PosteCard = ({ poste, activeSession, onStartSession, onOpenSessionActions,
     if (activeSession) {
       const startTime = new Date(activeSession.dateHeureDebut);
       const plannedMinutes = activeSession.dureeEstimeeMinutes || 60;
-      const tarifHoraire = poste.typePoste?.tarifHoraireBase || 25;
+      
+      // ✅ UTILISER LE MONTANT ESTIMÉ DE LA SESSION AU LIEU DU CALCUL LOCAL
+      const montantEstime = activeSession.montantTotal || activeSession.coutCalculeFinal || 0;
 
       // ✅ CORRECTION: Gestion spéciale des sessions en pause
       if (activeSession.statut === 'EN_PAUSE') {
@@ -53,9 +87,6 @@ const PosteCard = ({ poste, activeSession, onStartSession, onOpenSessionActions,
         const elapsedMsBeforePause = pauseStart - startTime - pauseTimeMs;
         const elapsedMinutesBeforePause = Math.max(0, Math.floor(elapsedMsBeforePause / (1000 * 60)));
         
-        // Prix calculé sur le temps réellement écoulé (hors pause)
-        const prixActuel = Math.max(0, (elapsedMinutesBeforePause / 60) * tarifHoraire);
-        
         // Temps de pause actuel
         const currentPauseMs = Date.now() - pauseStart;
         const currentPauseMinutes = Math.floor(currentPauseMs / (1000 * 60));
@@ -63,11 +94,17 @@ const PosteCard = ({ poste, activeSession, onStartSession, onOpenSessionActions,
         return {
           status: `En Pause (${currentPauseMinutes}min)`,
           color: 'yellow',
-          available: false, // ✅ CORRECTION: Poste non disponible
-          session: activeSession,
+          available: false,
+          session: {
+            ...activeSession,
+            montantEstime: montantEstime,
+            montantPaye: activeSession.montantPaye || 0,
+            montantDu: Math.max(0, montantEstime - (activeSession.montantPaye || 0)),
+            statutPaiement: activeSession.statutPaiement || 'IMPAYEE'
+          },
           elapsedMinutes: elapsedMinutesBeforePause,
           plannedMinutes: plannedMinutes,
-          currentPrice: prixActuel,
+          currentPrice: montantEstime, // Utiliser le montant estimé au lieu du calcul local
           isExpired: elapsedMinutesBeforePause >= plannedMinutes,
           isPaused: true,
           currentPauseMinutes: currentPauseMinutes,
@@ -84,19 +121,22 @@ const PosteCard = ({ poste, activeSession, onStartSession, onOpenSessionActions,
         const elapsedMs = Math.max(0, now - startTime - pauseTimeMs);
         const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
         
-        // Prix basé sur le temps réellement écoulé (hors pause)
-        const prixActuel = Math.max(0, (elapsedMinutes / 60) * tarifHoraire);
-        
         const isExpired = elapsedMinutes >= plannedMinutes;
         
         return {
           status: isExpired ? 'Dépassé' : 'En Cours',
           color: isExpired ? 'red' : 'green',
-          available: false, // ✅ CORRECTION: Poste non disponible
-          session: activeSession,
+          available: false,
+          session: {
+            ...activeSession,
+            montantEstime: montantEstime,
+            montantPaye: activeSession.montantPaye || 0,
+            montantDu: Math.max(0, montantEstime - (activeSession.montantPaye || 0)),
+            statutPaiement: activeSession.statutPaiement || 'IMPAYEE'
+          },
           elapsedMinutes: elapsedMinutes,
           plannedMinutes: plannedMinutes,
-          currentPrice: prixActuel,
+          currentPrice: montantEstime, // Utiliser le montant estimé au lieu du calcul local
           isExpired: isExpired,
           isPaused: false,
           icon: isExpired ? '⚠️' : '▶️'
@@ -149,13 +189,13 @@ const PosteCard = ({ poste, activeSession, onStartSession, onOpenSessionActions,
   };
 
   const formatPrice = (price) => {
-    return `${parseFloat(price || 0).toFixed(2)} MAD`;
+    return `${formatMontant(price)} MAD`; // ✅ CORRECTION: Utiliser formatMontant
   };
 
   const getTarifDisplay = () => {
     const tarif = poste.typePoste?.tarifHoraireBase;
     if (!tarif) return 'Tarif non défini';
-    return `${tarif} MAD/h`;
+    return `${formatMontant(tarif)} MAD/h`; // ✅ CORRECTION: Utiliser formatMontant
   };
 
   return (
@@ -178,7 +218,7 @@ const PosteCard = ({ poste, activeSession, onStartSession, onOpenSessionActions,
         </span>
       </div>
 
-      {/* ✅ CORRECTION: Informations spéciales pour les sessions en pause */}
+      {/* ✅ CORRECTION: Informations spéciales pour les sessions */}
       {statusInfo.session ? (
         <div className="space-y-2 mb-3">
           {statusInfo.isPaused && (
@@ -206,17 +246,45 @@ const PosteCard = ({ poste, activeSession, onStartSession, onOpenSessionActions,
             </div>
           </div>
           
+          {/* ✅ AJOUT: Affichage des informations de paiement */}
+          <div className="bg-gray-50 dark:bg-gray-700/50 p-2 rounded text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className={textMuted}>Montant estimé:</span>
+              <span className={`font-medium ${textPrimary}`}>
+                {formatMontant(statusInfo.session.montantEstime)} MAD
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className={textMuted}>Montant payé:</span>
+              <span className={`font-medium ${textPrimary}`}>
+                {formatMontant(statusInfo.session.montantPaye)} MAD
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className={textMuted}>Montant dû:</span>
+              <span className={`font-medium ${textPrimary}`}>
+                {formatMontant(statusInfo.session.montantDu)} MAD
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className={textMuted}>Statut paiement:</span>
+              {getStatutPaiementBadge(
+                statusInfo.session.statutPaiement
+              )}
+            </div>
+          </div>
+          
           <div className="flex justify-between items-center text-sm">
             <div>
               <p className={textMuted}>Prix actuel</p>
-              <p className={`font-semibold ${textPrimary}`}>
+              <p className={`font-semibold text-lg ${textPrimary}`}>
                 {formatPrice(statusInfo.currentPrice)}
               </p>
             </div>
             <div className="text-right">
               <p className={textMuted}>Session</p>
               <p className={`font-medium ${textPrimary}`}>
-                {statusInfo.session.numeroSession}
+                {statusInfo.session.referenceSession || statusInfo.session.numeroSession}
               </p>
             </div>
           </div>

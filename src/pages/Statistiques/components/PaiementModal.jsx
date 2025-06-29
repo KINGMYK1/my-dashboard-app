@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, DollarSign, Banknote } from 'lucide-react';
+// ✅ CORRECTION: Import spécifique des composants
 import { Modal, Button, Input, Select, TextArea } from '../../../components/ui';
 
 const PaiementModal = ({ isOpen, onClose, transaction, onUpdate, loading }) => {
@@ -17,7 +18,6 @@ const PaiementModal = ({ isOpen, onClose, transaction, onUpdate, loading }) => {
 
   useEffect(() => {
     if (transaction) {
-      // Calculer le montant restant
       const resteAPayer = transaction.resteAPayer || 0;
       setFormData(prev => ({
         ...prev,
@@ -153,7 +153,6 @@ const PaiementModal = ({ isOpen, onClose, transaction, onUpdate, loading }) => {
             onChange={(e) => setFormData(prev => ({ ...prev, montantSupplementaire: e.target.value }))}
             error={errors.montantSupplementaire}
             placeholder="0.00"
-            suffix="MAD"
             required
           />
         )}
@@ -164,10 +163,10 @@ const PaiementModal = ({ isOpen, onClose, transaction, onUpdate, loading }) => {
           value={formData.modePaiement}
           onChange={(value) => setFormData(prev => ({ ...prev, modePaiement: value }))}
           options={[
-            { value: 'ESPECES', label: 'Espèces', icon: <DollarSign className="w-4 h-4" /> },
-            { value: 'CARTE_BANCAIRE', label: 'Carte bancaire', icon: <CreditCard className="w-4 h-4" /> },
-            { value: 'VIREMENT', label: 'Virement', icon: <Banknote className="w-4 h-4" /> },
-            { value: 'CHEQUE', label: 'Chèque', icon: <Banknote className="w-4 h-4" /> }
+            { value: 'ESPECES', label: 'Espèces' },
+            { value: 'CARTE_BANCAIRE', label: 'Carte bancaire' },
+            { value: 'VIREMENT', label: 'Virement' },
+            { value: 'CHEQUE', label: 'Chèque' }
           ]}
           required
         />
@@ -221,7 +220,7 @@ const PaiementModal = ({ isOpen, onClose, transaction, onUpdate, loading }) => {
           <Button
             type="submit"
             variant="primary"
-            loading={loading}
+            disabled={loading}
           >
             {formData.action === 'finaliser_paiement' ? 'Finaliser le paiement' : 'Ajouter le paiement'}
           </Button>
