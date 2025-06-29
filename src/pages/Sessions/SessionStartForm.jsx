@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, User, Clock, CreditCard, Play, Calculator, DollarSign, Tag } from 'lucide-react';
+import { X, Play, Clock, User, Calculator, CreditCard, DollarSign, Check } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useClients } from '../../hooks/useClients';
 import { useDemarrerSession } from '../../hooks/useSessions';
+import PricingService from '../../services/pricingService';
 import Portal from '../../components/Portal/Portal';
 
 const SessionStartForm = ({ 
@@ -16,14 +17,13 @@ const SessionStartForm = ({
   const { showSuccess, showError } = useNotification();
   const isDarkMode = effectiveTheme === 'dark';
 
-  // ✅ États du formulaire avec plans tarifaires
+  // ✅ États du formulaire
   const [formData, setFormData] = useState({
     posteId: preselectedPoste?.id || '',
     clientId: '',
     dureeEstimeeMinutes: 60,
     notes: '',
     jeuPrincipal: '',
-    planTarifaireId: '', // ✅ Plan tarifaire sélectionné
     paiementAnticipe: false,
     modePaiement: 'ESPECES',
     montantPaye: '',
@@ -31,6 +31,8 @@ const SessionStartForm = ({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [prixCalcule, setPrixCalcule] = useState(null);
+  const [calculEnCours, setCalculEnCours] = useState(false);
 
   // ✅ Hooks
   const { data: clientsData, isLoading: isLoadingClients } = useClients();
@@ -39,141 +41,80 @@ const SessionStartForm = ({
   // ✅ Traitement des données clients
   const clients = useMemo(() => {
     if (!clientsData) return [];
-    const rawClients = clientsData.data?.clients || clientsData.clients || clientsData.data || clientsData;
-    return Array.isArray(rawClients) ? rawClients : [];
+    return Array.isArray(clientsData) ? clientsData : clientsData.clients || [];
   }, [clientsData]);
 
-  // ✅ Plans tarifaires disponibles pour le poste sélectionné
-  const plansDisponibles = useMemo(() => {
-    if (!preselectedPoste?.typePoste?.plansTarifaires) return [];
-    return preselectedPoste.typePoste.plansTarifaires
-      .filter(plan => plan.estActif)
-      .sort((a, b) => (a.dureeMinutesMin || 0) - (b.dureeMinutesMin || 0));
-  }, [preselectedPoste]);
+  // ✅ Calcul du prix via l'API
+  const calculerPrix = async () => {
+    if (!formData.posteId || !formData.dureeEstimeeMinutes) return;
 
-  // ✅ CALCUL CÔTÉ FRONTEND - Plan optimal automatique
-  const planOptimal = useMemo(() => {
-    if (!plansDisponibles.length || !formData.dureeEstimeeMinutes) return null;
-    
-    // Chercher le plan qui correspond exactement à la durée
-    const planCorrespondant = plansDisponibles.find(plan => {
-      const dureeMin = plan.dureeMinutesMin || 0;
-      const dureeMax = plan.dureeMinutesMax || Infinity;
-      return formData.dureeEstimeeMinutes >= dureeMin && formData.dureeEstimeeMinutes <= dureeMax;
-    });
-
-    // Si aucun plan exact n'est trouvé, prendre le plan le plus proche (plus grand)
-    if (!planCorrespondant) {
-      const plansSuperieurs = plansDisponibles.filter(plan => {
-        const dureeMin = plan.dureeMinutesMin || 0;
-        return formData.dureeEstimeeMinutes <= dureeMin;
+    try {
+      setCalculEnCours(true);
+      console.log('💰 [SESSION_START_FORM] Calcul prix via API:', {
+        posteId: formData.posteId,
+        dureeMinutes: formData.dureeEstimeeMinutes
       });
-      
-      if (plansSuperieurs.length > 0) {
-        // Prendre le plan avec la durée minimum la plus proche
-        const planLePlusProche = plansSuperieurs.reduce((prev, current) => {
-          const prevDiff = (prev.dureeMinutesMin || 0) - formData.dureeEstimeeMinutes;
-          const currentDiff = (current.dureeMinutesMin || 0) - formData.dureeEstimeeMinutes;
-          return currentDiff < prevDiff ? current : prev;
-        });
+
+      const result = await PricingService.calculerPrixEstime(
+        parseInt(formData.posteId),
+        parseInt(formData.dureeEstimeeMinutes)
+      );
+
+      console.log('✅ [SESSION_START_FORM] Prix calculé par API:', result);
+
+      if (result && result.data) {
+        setPrixCalcule(result.data);
         
-        console.log('🎯 [CALCUL] Plan le plus proche trouvé:', planLePlusProche.nom);
-        return planLePlusProche;
+        // Mettre à jour le montant payé pour le paiement anticipé
+        if (formData.paiementAnticipe) {
+          setFormData(prev => ({
+            ...prev,
+            montantPaye: result.data.montantTotal.toString()
+          }));
+        }
+      } else {
+        console.error('❌ [SESSION_START_FORM] Format de réponse invalide:', result);
+        setPrixCalcule(null);
       }
+    } catch (error) {
+      console.error('❌ [SESSION_START_FORM] Erreur calcul prix:', error);
+      setPrixCalcule(null);
+      showError('Erreur lors du calcul du prix');
+    } finally {
+      setCalculEnCours(false);
     }
-
-    console.log('🎯 [CALCUL] Recherche plan optimal pour', formData.dureeEstimeeMinutes, 'min');
-    console.log('🎯 [CALCUL] Plans disponibles:', plansDisponibles.map(p => ({
-      nom: p.nom,
-      min: p.dureeMinutesMin,
-      max: p.dureeMinutesMax,
-      prix: p.prix
-    })));
-    console.log('🎯 [CALCUL] Plan trouvé:', planCorrespondant);
-
-    return planCorrespondant;
-  }, [plansDisponibles, formData.dureeEstimeeMinutes]);
-
-  // ✅ CALCUL CÔTÉ FRONTEND - Prix calculé (CORRIGÉ)
-  const prixCalcule = useMemo(() => {
-    if (!preselectedPoste || !formData.dureeEstimeeMinutes) return null;
-
-    let montantTotal = 0;
-    let details = '';
-    let typeCalcul = '';
-    let planUtilise = null;
-
-    // Si un plan tarifaire est sélectionné manuellement
-    if (formData.planTarifaireId) {
-      const planSelectionne = plansDisponibles.find(p => p.id.toString() === formData.planTarifaireId);
-      if (planSelectionne) {
-        montantTotal = parseFloat(planSelectionne.prix) || 0;
-        details = `Plan "${planSelectionne.nom}" pour ${formData.dureeEstimeeMinutes}min`;
-        typeCalcul = 'PLAN_TARIFAIRE';
-        planUtilise = planSelectionne;
-      }
-    }
-    // Sinon, utiliser le plan optimal automatique
-    else if (planOptimal) {
-      montantTotal = parseFloat(planOptimal.prix) || 0;
-      details = `Plan optimal "${planOptimal.nom}" pour ${formData.dureeEstimeeMinutes}min`;
-      typeCalcul = 'PLAN_TARIFAIRE_AUTO';
-      planUtilise = planOptimal;
-    }
-    // ✅ CORRECTION: Toujours utiliser un plan tarifaire, jamais de tarif horaire
-    else if (plansDisponibles.length > 0) {
-      // Utiliser le plan le plus approprié selon la durée
-      const planLePlusApproprié = plansDisponibles.find(p => 
-        formData.dureeEstimeeMinutes >= p.dureeMinutesMin && 
-        formData.dureeEstimeeMinutes <= (p.dureeMinutesMax || Infinity)
-      ) || plansDisponibles[0]; // Plan par défaut si aucun ne correspond
-      
-      montantTotal = parseFloat(planLePlusApproprié.prix) || 0;
-      details = `Plan "${planLePlusApproprié.nom}" pour ${formData.dureeEstimeeMinutes}min`;
-      typeCalcul = 'PLAN_TARIFAIRE_AUTO';
-      planUtilise = planLePlusApproprié;
-    }
-    // Si vraiment aucun plan n'est disponible, refuser la session
-    else {
-      montantTotal = 0;
-      details = 'Aucun plan tarifaire disponible pour ce poste';
-      typeCalcul = 'ERREUR_PLANS';
-      planUtilise = null;
-    }
-
-    console.log('💰 [CALCUL] Prix calculé:', {
-      montantTotal,
-      details,
-      typeCalcul,
-      planUtilise: planUtilise?.nom
-    });
-
-    return {
-      montantTotal: parseFloat(montantTotal.toFixed(2)),
-      details,
-      typeCalcul,
-      planUtilise
-    };
-  }, [preselectedPoste, formData.dureeEstimeeMinutes, formData.planTarifaireId, plansDisponibles, planOptimal]);
+  };
 
   // ✅ Initialisation du formulaire
   useEffect(() => {
     if (open && preselectedPoste) {
       setFormData(prev => ({
         ...prev,
-        posteId: preselectedPoste.id.toString(),
-        planTarifaireId: '' // Reset du plan sélectionné
+        posteId: preselectedPoste.id
       }));
+      setPrixCalcule(null);
     }
   }, [open, preselectedPoste]);
 
+  // ✅ Calcul automatique du prix quand les paramètres changent
+  useEffect(() => {
+    if (formData.posteId && formData.dureeEstimeeMinutes > 0) {
+      const timeoutId = setTimeout(() => {
+        calculerPrix();
+      }, 500); // Délai pour éviter trop d'appels API
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      setPrixCalcule(null);
+    }
+  }, [formData.posteId, formData.dureeEstimeeMinutes]);
+
   // ✅ Mise à jour automatique du montant payé pour le paiement anticipé
   useEffect(() => {
-    if (formData.paiementAnticipe && prixCalcule?.montantTotal) {
+    if (formData.paiementAnticipe && prixCalcule) {
       setFormData(prev => ({
         ...prev,
-        montantPaye: prixCalcule.montantTotal.toString(),
-        marquerCommePayee: true // Par défaut, marquer comme payée si paiement anticipé
+        montantPaye: prixCalcule.montantTotal.toString()
       }));
     } else if (!formData.paiementAnticipe) {
       setFormData(prev => ({
@@ -182,108 +123,78 @@ const SessionStartForm = ({
         marquerCommePayee: false
       }));
     }
-  }, [formData.paiementAnticipe, prixCalcule?.montantTotal]);
-
-  // ✅ Sélection d'un plan tarifaire
-  const handlePlanSelection = (planId) => {
-    const plan = plansDisponibles.find(p => p.id === planId);
-    if (plan) {
-      setFormData(prev => ({
-        ...prev,
-        planTarifaireId: planId.toString(),
-        // Optionnel : ajuster la durée au plan
-        // dureeEstimeeMinutes: plan.dureeMinutesMax || plan.dureeMinutesMin || 60
-      }));
-    } else {
-      // Mode tarif horaire libre
-      setFormData(prev => ({
-        ...prev,
-        planTarifaireId: ''
-      }));
-    }
-  };
+  }, [formData.paiementAnticipe, prixCalcule]);
 
   // ✅ Soumission du formulaire
- // Dans handleSubmit du SessionStartForm.jsx
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (!formData.posteId) {
-    showError('Veuillez sélectionner un poste');
-    return;
-  }
-
-  if (!formData.dureeEstimeeMinutes || formData.dureeEstimeeMinutes <= 0) {
-    showError('Veuillez saisir une durée valide');
-    return;
-  }
-
-  if (!prixCalcule || prixCalcule.typeCalcul === 'ERREUR_PLANS') {
-    showError('Aucun plan tarifaire disponible pour ce poste');
-    return;
-  }
-
-  // Validation du paiement anticipé
-  if (formData.paiementAnticipe) {
-    const montantPaye = parseFloat(formData.montantPaye || 0);
-    if (montantPaye <= 0) {
-      showError('Veuillez saisir un montant payé valide');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.posteId) {
+      showError('Veuillez sélectionner un poste');
       return;
     }
-    if (montantPaye > prixCalcule.montantTotal * 1.5) { // Limite de sécurité
-      showError('Le montant payé semble trop élevé');
+
+    if (!formData.dureeEstimeeMinutes || formData.dureeEstimeeMinutes <= 0) {
+      showError('Veuillez saisir une durée valide');
       return;
     }
-  }
 
-  setIsSubmitting(true);
+    if (!prixCalcule) {
+      showError('Impossible de calculer le prix. Veuillez réessayer.');
+      return;
+    }
 
-  try {
-    const sessionData = {
-      posteId: parseInt(formData.posteId),
-      dureeMinutes: parseInt(formData.dureeEstimeeMinutes),
-      clientId: formData.clientId || null,
-      notes: formData.notes,
-      jeuPrincipal: formData.jeuPrincipal,
-      // ✅ CORRECTION: Envoyer le plan utilisé (sélectionné ou optimal)
-      planTarifaireId: formData.planTarifaireId ? 
-        parseInt(formData.planTarifaireId) : 
-        (prixCalcule.planUtilise?.id || null),
-      // ✅ CORRECTION: Paramètres de paiement anticipé
-      paiementAnticipe: formData.paiementAnticipe,
-      montantPaye: formData.paiementAnticipe ? parseFloat(formData.montantPaye || 0) : 0,
-      marquerCommePayee: formData.paiementAnticipe && formData.marquerCommePayee,
-      modePaiement: formData.paiementAnticipe ? formData.modePaiement : null,
-    };
+    // Validation du paiement anticipé
+    if (formData.paiementAnticipe) {
+      const montantPaye = parseFloat(formData.montantPaye || 0);
+      if (montantPaye <= 0) {
+        showError('Veuillez saisir un montant payé valide');
+        return;
+      }
+      if (montantPaye > prixCalcule.montantTotal * 1.5) {
+        showError('Le montant payé semble trop élevé');
+        return;
+      }
+    }
 
-    console.log('📤 [SESSION_START_FORM] Envoi données:', sessionData);
-    console.log('💰 [SESSION_START_FORM] Prix calculé:', prixCalcule);
+    setIsSubmitting(true);
 
-    await demarrerSessionMutation.mutateAsync(sessionData);
-    
-    showSuccess('Session démarrée avec succès');
-    if (onSessionStarted) onSessionStarted(sessionData, preselectedPoste);
-    onClose();
-    
-  } catch (error) {
-    console.error('❌ [SESSION_START_FORM] Erreur démarrage:', error);
-    showError(`Erreur lors du démarrage: ${error.message}`);
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    try {
+      const sessionData = {
+        posteId: parseInt(formData.posteId),
+        dureeMinutes: parseInt(formData.dureeEstimeeMinutes),
+        clientId: formData.clientId || null,
+        notes: formData.notes,
+        jeuPrincipal: formData.jeuPrincipal,
+        // ✅ Paramètres de paiement anticipé
+        paiementAnticipe: formData.paiementAnticipe,
+        montantPaye: formData.paiementAnticipe ? parseFloat(formData.montantPaye || 0) : 0,
+        marquerCommePayee: formData.paiementAnticipe && formData.marquerCommePayee,
+        modePaiement: formData.paiementAnticipe ? formData.modePaiement : null,
+      };
+
+      console.log('📤 [SESSION_START_FORM] Envoi données:', sessionData);
+      console.log('💰 [SESSION_START_FORM] Prix calculé:', prixCalcule);
+
+      await demarrerSessionMutation.mutateAsync(sessionData);
+      
+      showSuccess('Session démarrée avec succès');
+      if (onSessionStarted) onSessionStarted(sessionData, preselectedPoste);
+      onClose();
+      
+    } catch (error) {
+      console.error('❌ [SESSION_START_FORM] Erreur démarrage:', error);
+      showError(`Erreur lors du démarrage: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // ✅ Helpers de style
   const getInputClass = () => `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
     isDarkMode 
       ? 'bg-gray-700 border-gray-600 text-white' 
       : 'bg-white border-gray-300 text-gray-900'
-  }`;
-
-  const getCardClass = (isSelected) => `p-4 border-2 rounded-lg cursor-pointer transition-all ${
-    isSelected
-      ? 'border-purple-500 bg-purple-100 dark:bg-purple-900/30'
-      : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-500'
   }`;
 
   if (!open || !preselectedPoste) return null;
@@ -298,411 +209,296 @@ const handleSubmit = async (e) => {
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
             <div>
-              <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                🚀 Démarrer une Session
+              <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                🚀 Démarrer une session
               </h2>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                Poste: {preselectedPoste.nom} - {preselectedPoste.typePoste?.nom}
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {preselectedPoste.nom} - {preselectedPoste.typePoste?.nom}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className={`p-2 rounded-lg transition-colors ${
+                isDarkMode 
+                  ? 'hover:bg-gray-700 text-gray-400' 
+                  : 'hover:bg-gray-100 text-gray-500'
+              }`}
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Formulaire */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            
-            {/* Section Plans Tarifaires */}
-            {plansDisponibles.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <Tag className="w-5 h-5 text-purple-600" />
-                  <h3 className={`text-lg font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    Choisir un plan tarifaire
-                  </h3>
+          <form onSubmit={handleSubmit} className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* Colonne gauche - Paramètres de session */}
+              <div className="space-y-6">
+                <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  ⚙️ Paramètres de session
+                </h3>
+
+                {/* Durée */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <Clock className="w-4 h-4 inline mr-2" />
+                    Durée estimée (minutes) *
+                  </label>
+                  <input
+                    type="number"
+                    min="15"
+                    max="720"
+                    step="15"
+                    value={formData.dureeEstimeeMinutes}
+                    onChange={(e) => setFormData(prev => ({ 
+                      ...prev, 
+                      dureeEstimeeMinutes: parseInt(e.target.value) || 60 
+                    }))}
+                    className={getInputClass()}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Entre 15 minutes et 12 heures (par tranches de 15min)
+                  </p>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Option tarif libre */}
-                  <div 
-                    className={getCardClass(!formData.planTarifaireId && !planOptimal)}
-                    onClick={() => handlePlanSelection(null)}
+
+                {/* Client */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    <User className="w-4 h-4 inline mr-2" />
+                    Client (optionnel)
+                  </label>
+                  <select
+                    value={formData.clientId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, clientId: e.target.value }))}
+                    className={getInputClass()}
+                    disabled={isLoadingClients}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <input
-                        type="radio"
-                        name="planTarifaire"
-                        checked={!formData.planTarifaireId && !planOptimal}
-                        onChange={() => handlePlanSelection(null)}
-                        className="text-purple-600"
-                      />
-                      <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded">
-                        Libre
-                      </span>
-                    </div>
-                    <h4 className="font-medium">Tarif horaire</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {preselectedPoste.typePoste?.tarifHoraireBase} MAD/heure
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Facturation à la minute
-                    </p>
-                  </div>
+                    <option value="">-- Session libre --</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.prenom} {client.nom}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  {/* Option plan optimal automatique */}
-                  {planOptimal && !formData.planTarifaireId && (
-                    <div className="p-4 border-2 border-green-500 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
-                          ✨ Recommandé
-                        </span>
-                        <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
-                          Auto
+                {/* Jeu principal */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    🎮 Jeu principal (optionnel)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.jeuPrincipal}
+                    onChange={(e) => setFormData(prev => ({ ...prev, jeuPrincipal: e.target.value }))}
+                    placeholder="Ex: Fortnite, FIFA 24..."
+                    className={getInputClass()}
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    📝 Notes (optionnel)
+                  </label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                    placeholder="Notes sur la session..."
+                    className={getInputClass()}
+                  />
+                </div>
+              </div>
+
+              {/* Colonne droite - Prix et paiement */}
+              <div className="space-y-6">
+                
+                {/* Affichage du prix calculé */}
+                <div>
+                  <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    💰 Estimation du coût
+                  </h3>
+                  
+                  {calculEnCours ? (
+                    <div className="flex items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                      <span className="ml-3 text-gray-500">Calcul en cours...</span>
+                    </div>
+                  ) : prixCalcule ? (
+                    <div className={`p-4 rounded-lg border-2 ${
+                      isDarkMode ? 'border-green-500 bg-green-900/20' : 'border-green-300 bg-green-50'
+                    }`}>
+                      <div className="flex items-center space-x-2 mb-3">
+                        <Calculator className="w-5 h-5 text-green-600" />
+                        <span className={`text-xs px-2 py-1 rounded bg-green-200 text-green-800`}>
+                          📋 Plan tarifaire
                         </span>
                       </div>
-                      <h4 className="font-medium text-lg">{planOptimal.nom}</h4>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-2xl font-bold text-green-600">
-                          {planOptimal.prix} MAD
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {planOptimal.dureeMinutesMin}-{planOptimal.dureeMinutesMax || '∞'} min
-                        </span>
-                      </div>
-                      <p className="text-xs text-green-600 mt-2">
-                        Plan optimal pour {formData.dureeEstimeeMinutes} minutes
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Plans tarifaires */}
-                  {plansDisponibles.map((plan) => {
-                    const isSelected = formData.planTarifaireId === plan.id.toString();
-                    const isOptimalPlan = planOptimal?.id === plan.id;
-                    
-                    return (
-                      <div 
-                        key={plan.id}
-                        className={getCardClass(isSelected)}
-                        onClick={() => handlePlanSelection(plan.id)}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <input
-                            type="radio"
-                            name="planTarifaire"
-                            checked={isSelected}
-                            onChange={() => handlePlanSelection(plan.id)}
-                            className="text-purple-600"
-                          />
-                          <div className="flex gap-1">
-                            {isOptimalPlan && !isSelected && (
-                              <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
-                                Optimal
-                              </span>
-                            )}
-                            {plan.estPromo && (
-                              <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">
-                                Promo
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <h4 className="font-medium text-lg">{plan.nom}</h4>
-                        <div className="flex justify-between items-center mt-2">
-                          <span className="text-2xl font-bold text-purple-600">
-                            {plan.prix} MAD
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+                            Durée: {Math.floor(formData.dureeEstimeeMinutes / 60)}h {formData.dureeEstimeeMinutes % 60}min
                           </span>
-                          <span className="text-sm text-gray-500">
-                            {plan.dureeMinutesMin}-{plan.dureeMinutesMax || '∞'} min
+                          <span className="font-medium text-green-600">
+                            {prixCalcule.planUtilise?.nom || 'Plan tarifaire'}
                           </span>
                         </div>
                         
-                        {plan.description && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                            {plan.description}
+                        <div className="flex justify-between font-bold text-xl border-t pt-2">
+                          <span className={isDarkMode ? 'text-white' : 'text-gray-900'}>
+                            Total estimé:
+                          </span>
+                          <span className="text-green-600">
+                            {prixCalcule.montantTotal.toFixed(2)} MAD
+                          </span>
+                        </div>
+                        
+                        {prixCalcule.details && (
+                          <p className="text-sm text-gray-500 mt-2">
+                            {prixCalcule.details}
                           </p>
                         )}
-                        
-                        <div className="mt-2 text-xs text-gray-500">
-                          ≈ {((plan.prix / (plan.dureeMinutesMax || plan.dureeMinutesMin)) * 60).toFixed(2)} MAD/h
-                        </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Durée estimée */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Durée estimée (minutes) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="15"
-                  max="720"
-                  step="15"
-                  value={formData.dureeEstimeeMinutes}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    dureeEstimeeMinutes: parseInt(e.target.value) || 60 
-                  }))}
-                  className={getInputClass()}
-                  required
-                />
-                {planOptimal && !formData.planTarifaireId && (
-                  <p className="text-xs text-green-600 mt-1">
-                    ✨ Compatible avec le plan "{planOptimal.nom}"
-                  </p>
-                )}
-              </div>
-
-              {/* Client */}
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Client (optionnel)
-                </label>
-                <select
-                  value={formData.clientId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, clientId: e.target.value }))}
-                  className={getInputClass()}
-                  disabled={isLoadingClients}
-                >
-                  <option value="">-- Session libre --</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.prenom} {client.nom}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Affichage du prix calculé */}
-            {prixCalcule && (
-              <div className={`p-4 rounded-lg border-2 ${
-                isDarkMode ? 'border-blue-500 bg-blue-900/20' : 'border-blue-300 bg-blue-50'
-              }`}>
-                <div className="flex items-center space-x-2 mb-3">
-                  <Calculator className="w-5 h-5 text-blue-600" />
-                  <h4 className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    💰 Estimation du coût
-                  </h4>
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    prixCalcule.typeCalcul === 'ERREUR_PLANS'
-                      ? 'bg-red-200 text-red-800' 
-                      : 'bg-green-200 text-green-800'
-                  }`}>
-                    {prixCalcule.typeCalcul === 'ERREUR_PLANS' ? '❌ Erreur' : '📋 Plan tarifaire'}
-                  </span>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
-                      Durée: {Math.floor(formData.dureeEstimeeMinutes / 60)}h {formData.dureeEstimeeMinutes % 60}min
-                    </span>
-                    <span className={`font-medium ${
-                      prixCalcule.typeCalcul === 'ERREUR_PLANS'
-                        ? 'text-red-600' 
-                        : 'text-green-600'
-                    }`}>
-                      {prixCalcule.planUtilise?.nom || (prixCalcule.typeCalcul === 'ERREUR_PLANS' ? 'Aucun plan' : 'Plan tarifaire')}
-                    </span>
-                  </div>
-                  
-                  <div className="flex justify-between font-bold text-xl border-t pt-2">
-                    <span className={isDarkMode ? 'text-white' : 'text-gray-900'}>
-                      Total estimé:
-                    </span>
-                    <span className={prixCalcule.typeCalcul === 'ERREUR_PLANS' ? 'text-red-600' : 'text-green-600'}>
-                      {prixCalcule.montantTotal.toFixed(2)} MAD
-                    </span>
-                  </div>
-                  
-                  {prixCalcule.details && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      {prixCalcule.details}
-                    </p>
-                  )}
-
-                  {/* Indication si calcul optimal */}
-                  {prixCalcule.typeCalcul === 'PLAN_TARIFAIRE_AUTO' && (
-                    <div className="flex items-center space-x-1 text-sm text-green-600 mt-2">
-                      <span>✨</span>
-                      <span>Plan optimal sélectionné automatiquement</span>
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Jeu principal et Notes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Jeu principal (optionnel)
-                </label>
-                <input
-                  type="text"
-                  value={formData.jeuPrincipal}
-                  onChange={(e) => setFormData(prev => ({ ...prev, jeuPrincipal: e.target.value }))}
-                  placeholder="Ex: Fortnite, FIFA 24..."
-                  className={getInputClass()}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Notes (optionnel)
-                </label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                  rows={3}
-                  placeholder="Notes sur la session..."
-                  className={getInputClass()}
-                />
-              </div>
-            </div>
-
-            {/* Paiement anticipé */}
-            <div className="border-t pt-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <input
-                  type="checkbox"
-                  id="paiementAnticipe"
-                  checked={formData.paiementAnticipe}
-                  onChange={(e) => setFormData(prev => ({ ...prev, paiementAnticipe: e.target.checked }))}
-                  className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
-                />
-                <label htmlFor="paiementAnticipe" className="flex items-center space-x-2 cursor-pointer">
-                  <CreditCard className="w-5 h-5 text-green-500" />
-                  <span className={`font-medium text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    💳 Effectuer un paiement anticipé
-                  </span>
-                </label>
-              </div>
-
-              {formData.paiementAnticipe && prixCalcule && (
-                <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <DollarSign className="w-4 h-4 text-green-600" />
-                    <h5 className="font-medium text-green-800 dark:text-green-200">
-                      Détails du paiement
-                    </h5>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                        Mode de paiement *
-                      </label>
-                      <select
-                        value={formData.modePaiement}
-                        onChange={(e) => setFormData(prev => ({ ...prev, modePaiement: e.target.value }))}
-                        className={getInputClass()}
-                        required
-                      >
-                        <option value="ESPECES">💵 Espèces</option>
-                        <option value="CARTE">💳 Carte bancaire</option>
-                        <option value="VIREMENT">🏦 Virement</option>
-                        <option value="CHEQUE">📝 Chèque</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                        Montant payé (MAD) *
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={prixCalcule.montantTotal * 1.5} // Limite de sécurité
-                        step="0.01"
-                        value={formData.montantPaye}
-                        onChange={(e) => setFormData(prev => ({ ...prev, montantPaye: e.target.value }))}
-                        placeholder={prixCalcule.montantTotal.toFixed(2)}
-                        className={getInputClass()}
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Montant estimé: {prixCalcule.montantTotal.toFixed(2)} MAD
+                  ) : (
+                    <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
+                      <Calculator className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">
+                        {formData.dureeEstimeeMinutes ? 'Calcul du prix...' : 'Saisissez une durée pour voir le prix'}
                       </p>
                     </div>
-                  </div>
+                  )}
+                </div>
 
-                  {/* Résumé du paiement */}
-                  <div className="bg-white dark:bg-gray-800 p-3 rounded border">
-                    <h6 className="text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                      📋 Résumé du paiement
-                    </h6>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span>Montant total estimé:</span>
-                        <span className="font-medium">{prixCalcule.montantTotal.toFixed(2)} MAD</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Montant payé:</span>
-                        <span className="font-medium text-green-600">
-                          {parseFloat(formData.montantPaye || 0).toFixed(2)} MAD
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-t pt-1 font-medium">
-                        <span>Reste à payer:</span>
-                        <span className={
-                          (prixCalcule.montantTotal - parseFloat(formData.montantPaye || 0)) <= 0 
-                            ? 'text-green-600' 
-                            : 'text-orange-600'
-                        }>
-                          {Math.max(0, prixCalcule.montantTotal - parseFloat(formData.montantPaye || 0)).toFixed(2)} MAD
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
+                {/* Paiement anticipé */}
+                <div className="border-t pt-6">
+                  <div className="flex items-center space-x-3 mb-4">
                     <input
                       type="checkbox"
-                      id="marquerCommePayee"
-                      checked={formData.marquerCommePayee}
-                      onChange={(e) => setFormData(prev => ({ ...prev, marquerCommePayee: e.target.checked }))}
-                      className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                      id="paiementAnticipe"
+                      checked={formData.paiementAnticipe}
+                      onChange={(e) => setFormData(prev => ({ ...prev, paiementAnticipe: e.target.checked }))}
+                      className="w-5 h-5 text-green-600 rounded focus:ring-green-500"
                     />
-                    <label htmlFor="marquerCommePayee" className="text-sm text-green-700 dark:text-green-300">
-                      ✅ Marquer comme entièrement payée
-                      {parseFloat(formData.montantPaye || 0) < prixCalcule.montantTotal && (
-                        <span className="text-orange-600 ml-2">
-                          (paiement partiel de {((parseFloat(formData.montantPaye || 0) / prixCalcule.montantTotal) * 100).toFixed(0)}%)
-                        </span>
-                      )}
+                    <label htmlFor="paiementAnticipe" className="flex items-center space-x-2 cursor-pointer">
+                      <CreditCard className="w-5 h-5 text-green-500" />
+                      <span className={`font-medium text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        💳 Effectuer un paiement anticipé
+                      </span>
                     </label>
                   </div>
+
+                  {formData.paiementAnticipe && prixCalcule && (
+                    <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <DollarSign className="w-4 h-4 text-green-600" />
+                        <h5 className="font-medium text-green-800 dark:text-green-200">
+                          Détails du paiement
+                        </h5>
+                      </div>
+
+                      {/* Mode de paiement */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-green-800 dark:text-green-200">
+                          Mode de paiement
+                        </label>
+                        <select
+                          value={formData.modePaiement}
+                          onChange={(e) => setFormData(prev => ({ ...prev, modePaiement: e.target.value }))}
+                          className={`${getInputClass()} text-sm`}
+                        >
+                          <option value="ESPECES">💵 Espèces</option>
+                          <option value="CARTE">💳 Carte</option>
+                          <option value="VIREMENT">🏦 Virement</option>
+                          <option value="CHEQUE">📄 Chèque</option>
+                        </select>
+                      </div>
+
+                      {/* Montant à payer */}
+                      <div>
+                        <label className="block text-sm font-medium mb-2 text-green-800 dark:text-green-200">
+                          Montant à payer (MAD)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max={prixCalcule.montantTotal * 1.5}
+                          value={formData.montantPaye}
+                          onChange={(e) => setFormData(prev => ({ ...prev, montantPaye: e.target.value }))}
+                          className={`${getInputClass()} text-lg font-semibold`}
+                        />
+                        <p className="text-xs text-green-600 mt-1">
+                          Montant estimé: {prixCalcule.montantTotal.toFixed(2)} MAD
+                        </p>
+                      </div>
+
+                      {/* Marquer comme payée */}
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="marquerCommePayee"
+                          checked={formData.marquerCommePayee}
+                          onChange={(e) => setFormData(prev => ({ ...prev, marquerCommePayee: e.target.checked }))}
+                          className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                        />
+                        <label htmlFor="marquerCommePayee" className="text-sm text-green-800 dark:text-green-200">
+                          Marquer la session comme entièrement payée
+                        </label>
+                      </div>
+
+                      {/* Résumé du paiement */}
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                        <div className="text-sm space-y-1">
+                          <div className="flex justify-between">
+                            <span>Montant total:</span>
+                            <span className="font-medium">{prixCalcule.montantTotal.toFixed(2)} MAD</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Montant payé:</span>
+                            <span className="font-medium text-green-600">
+                              {parseFloat(formData.montantPaye || 0).toFixed(2)} MAD
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-semibold border-t pt-1">
+                            <span>Reste à payer:</span>
+                            <span className={
+                              (prixCalcule.montantTotal - parseFloat(formData.montantPaye || 0)) <= 0 
+                                ? 'text-green-600' 
+                                : 'text-red-600'
+                            }>
+                              {Math.max(0, prixCalcule.montantTotal - parseFloat(formData.montantPaye || 0)).toFixed(2)} MAD
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 pt-4">
+            <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                className={`px-6 py-2 border rounded-lg font-medium transition-colors ${
+                  isDarkMode 
+                    ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 Annuler
               </button>
+              
               <button
                 type="submit"
-                disabled={isSubmitting || !prixCalcule}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                disabled={isSubmitting || !prixCalcule || calculEnCours}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
                 {isSubmitting ? (
                   <>
@@ -717,7 +513,6 @@ const handleSubmit = async (e) => {
                 )}
               </button>
             </div>
-
           </form>
         </div>
       </div>
