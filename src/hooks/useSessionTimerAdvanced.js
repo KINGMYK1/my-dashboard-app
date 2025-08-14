@@ -14,7 +14,8 @@ export const useSessionTimerAdvanced = (options = {}) => {
     onSessionWarning = () => {},
     updateInterval = 1000,
     warningMinutes = [5, 1],
-    enableNotifications = true
+    enableNotifications = true,
+    enabled = true
   } = options;
 
   const calculateSessionTime = useCallback((session) => {
@@ -114,6 +115,26 @@ export const useSessionTimerAdvanced = (options = {}) => {
     }
   }, [showWarning, showError, onSessionExpired, onSessionWarning, enableNotifications, warningMinutes]);
 
+  const stopSessionTracking = useCallback((sessionId) => {
+    if (!sessionId) return;
+
+    console.log('🛑 [TIMER] Arrêt tracking session:', sessionId);
+    
+    const interval = intervalsRef.current.get(sessionId);
+    if (interval) {
+      clearInterval(interval);
+      intervalsRef.current.delete(sessionId);
+    }
+
+    setTimers(prev => {
+      const newTimers = new Map(prev);
+      newTimers.delete(sessionId);
+      return newTimers;
+    });
+
+    notificationsSentRef.current.delete(sessionId);
+  }, []);
+
   const updateTimer = useCallback((session) => {
     if (!session?.id) return null;
 
@@ -131,6 +152,9 @@ export const useSessionTimerAdvanced = (options = {}) => {
     return timeInfo;
   }, [calculateSessionTime, sendNotificationIfNeeded]);
 
+  // Ref pour éviter les dépendances circulaires
+  const activeSessionsRef = useRef([]);
+  
   const startSessionTracking = useCallback((session) => {
     if (!session?.id || !session?.dateHeureDebut) {
       console.warn('❌ [TIMER] Session invalide pour tracking:', session);
@@ -152,8 +176,8 @@ export const useSessionTimerAdvanced = (options = {}) => {
 
     // Interval de mise à jour
     const interval = setInterval(() => {
-      // ✅ SÉCURITÉ: Vérifier que la session est toujours active
-      const currentSession = activeSessions.find(s => s.id === sessionId);
+      // ✅ SÉCURITÉ: Vérifier que la session est toujours active via ref
+      const currentSession = activeSessionsRef.current.find(s => s.id === sessionId);
       if (currentSession && (currentSession.statut === 'EN_COURS' || currentSession.statut === 'EN_PAUSE')) {
         updateTimer(currentSession);
       } else {
@@ -163,27 +187,7 @@ export const useSessionTimerAdvanced = (options = {}) => {
     }, updateInterval);
 
     intervalsRef.current.set(sessionId, interval);
-  }, [updateTimer, updateInterval, activeSessions]);
-
-  const stopSessionTracking = useCallback((sessionId) => {
-    if (!sessionId) return;
-
-    console.log('🛑 [TIMER] Arrêt tracking session:', sessionId);
-    
-    const interval = intervalsRef.current.get(sessionId);
-    if (interval) {
-      clearInterval(interval);
-      intervalsRef.current.delete(sessionId);
-    }
-
-    setTimers(prev => {
-      const newTimers = new Map(prev);
-      newTimers.delete(sessionId);
-      return newTimers;
-    });
-
-    notificationsSentRef.current.delete(sessionId);
-  }, []);
+  }, [updateTimer, updateInterval, stopSessionTracking]);
 
   const updateActiveSessions = useCallback((sessions) => {
     // ✅ CORRECTION: Validation et normalisation
@@ -208,6 +212,8 @@ export const useSessionTimerAdvanced = (options = {}) => {
 
     // console.log(`🎯 [TIMER] Mise à jour: ${activeSessionsList.length} sessions actives`);
 
+    // ✅ Mise à jour des refs et state
+    activeSessionsRef.current = activeSessionsList;
     setActiveSessions(activeSessionsList);
 
     // Démarrer le tracking pour les nouvelles sessions
@@ -235,6 +241,7 @@ export const useSessionTimerAdvanced = (options = {}) => {
     Array.from(intervalsRef.current.values()).forEach(clearInterval);
     intervalsRef.current.clear();
     notificationsSentRef.current.clear();
+    activeSessionsRef.current = [];
     setTimers(new Map());
     setActiveSessions([]);
   }, []);

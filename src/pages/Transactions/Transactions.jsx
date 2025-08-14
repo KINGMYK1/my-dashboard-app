@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { 
   CreditCard, 
   DollarSign, 
@@ -24,7 +24,6 @@ import {
   useTransactions,
   useTransactionsEnAttente,
   useUpdatePayment,
-  useDeleteTransaction,
   useRefundTransaction,
   useSalesStatistics
 } from '../../hooks/useTransactions';
@@ -85,7 +84,6 @@ const Transactions = () => {
 
   // Mutations
   const updatePaymentMutation = useUpdatePayment();
-  const deleteTransactionMutation = useDeleteTransaction();
   const refundTransactionMutation = useRefundTransaction();
 
   // Permissions

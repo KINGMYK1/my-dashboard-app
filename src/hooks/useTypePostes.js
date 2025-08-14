@@ -124,7 +124,7 @@ export function useSimulerTarifs(typePosteId, dureeMinutes) {
     // Scénario tarif horaire
     const prixHoraire = (dureeMinutes / 60) * typePoste.tarifHoraireBase;
     scenarios.push({
-      type: 'TARIF_HORAIRE',
+      type: 'PLAN_TARIFAIRE',
       nom: 'Tarif horaire',
       prix: prixHoraire,
       description: `${typePoste.tarifHoraireBase} ${typePoste.devise}/h`,

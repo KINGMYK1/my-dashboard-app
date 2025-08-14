@@ -436,7 +436,7 @@ const HistoriqueTab = ({ details, getTextColorClass, formatDate }) => (
                   </div>
                   {action.utilisateur && (
                     <p className={`text-xs ${getTextColorClass(false)} mt-1`}>
-                      Par: {action.utilisateur.prenom} {action.utilisateur.nom}
+                      Par: {action.utilisateur.firstName} {action.utilisateur.lastName}
                     </p>
                   )}
                 </div>

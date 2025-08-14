@@ -6,7 +6,6 @@ import {
   Shield, 
   Key, 
   Settings, 
-  LogOut, 
   Monitor, Activity ,Receipt ,
   UserPlus, 
   ShoppingCart, 
@@ -32,7 +31,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState({});
-  const { user, logout, hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { translations } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
@@ -100,10 +99,16 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     permission: 'SESSIONS_VIEW' 
   },
     { 
+      icon: <DollarSign size={20} />, 
+      label: translations.transactions || 'Transactions', 
+      path: '/dashboard/transactions',
+      permission: 'SESSIONS_VIEW' 
+    },
+    { 
       icon: <UserPlus size={20} />, 
       label: translations.customers || 'Clients', 
       path: '/dashboard/clients',
-      permission: 'CUSTOMERS_VIEW' 
+      permission: 'CLIENTS_VIEW' 
     },
     // ✅ CORRECTION: Menu Abonnements avec les bonnes routes
     {
@@ -138,27 +143,39 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
       submenuKey: 'analytics',
       children: [
         {
+          icon: <BarChart3 size={18} />,
+          label: translations.detailedStatistics || 'Vue d\'ensemble',
+          path: '/dashboard/statistiques',
+          permission: 'SESSIONS_VIEW'
+        },
+        {
           icon: <Monitor size={18} />,
           label: translations.dashboardPostes || 'Dashboard Postes',
-          path: '/dashboard/dashboard-postes',
+          path: '/dashboard/statistiques/dashboard-postes',
+          permission: 'SESSIONS_VIEW'
+        },
+        {
+          icon: <Gamepad2 size={18} />,
+          label: 'Statistiques Postes',
+          path: '/dashboard/statistiques/postes',
           permission: 'SESSIONS_VIEW'
         },
         {
           icon: <DollarSign size={18} />,
           label: translations.transactionStats || 'Statistiques Transactions',
-          path: '/dashboard/statistiques-transactions',
+          path: '/dashboard/statistiques/transactions',
           permission: 'SESSIONS_VIEW'
         },
         {
           icon: <Calendar size={18} />,
           label: translations.sessionHistory || 'Historique Sessions',
-          path: '/dashboard/historique-sessions',
+          path: '/dashboard/statistiques/historique-sessions',
           permission: 'SESSIONS_VIEW'
         },
         {
-          icon: <BarChart3 size={18} />,
-          label: translations.detailedStatistics || 'Vue d\'ensemble',
-          path: '/dashboard/statistiques',
+          icon: <TrendingUp size={18} />,
+          label: 'Chiffre d\'Affaires',
+          path: '/dashboard/statistiques/chiffre-affaires',
           permission: 'SESSIONS_VIEW'
         }
       ]
@@ -284,29 +301,18 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('🎯 [SIDEBAR] Navigation vers:', path);
+    console.log('🎯 [SIDEBAR] Navigation vers:', path, 'depuis:', location.pathname);
     
-    // Fermer le sidebar sur mobile après navigation
+    // ✅ CORRECTION: Navigation avec force refresh pour éviter les problèmes de cache
+    navigate(path, { replace: false });
+    
+    // Fermer le sidebar sur mobile APRÈS navigation
     if (isMobile && expanded) {
-      toggleSidebar();
-    }
-    
-    // ✅ CORRECTION: Forcer la navigation même si on est déjà sur une route similaire
-    if (location.pathname !== path) {
-      navigate(path, { replace: false });
-    } else {
-      // Si on est déjà sur la route, forcer un refresh du composant
-      navigate(path, { replace: true });
-    }
-  };
-
-  const handleLogout = async (e) => {
-    e.preventDefault();
-    try {
-      await logout();
-      navigate('/');
-    } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error);
+      // Délai pour laisser la navigation se faire d'abord
+      setTimeout(() => {
+        console.log('📱 [SIDEBAR] Fermeture sidebar mobile');
+        toggleSidebar();
+      }, 100);
     }
   };
 
@@ -323,7 +329,7 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
         }
       }
     });
-  }, [location.pathname]);
+  }, [location.pathname, expandedMenus, filteredMenuItems]);
 
   // Styles fixes pour le sidebar (toujours thème sombre)
   const sidebarBg = 'rgba(30, 41, 59, 0.9)';

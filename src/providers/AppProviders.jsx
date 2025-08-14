@@ -10,6 +10,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { PostesProvider } from '../contexts/PostesContext';
 import { SessionsProvider } from '../contexts/SessionsContext';
 import { GamingCenterMapProvider } from '../contexts/GamingCenterMapContext';
+import { PaymentProvider } from '../contexts/PaymentContext';
 
 // ✅ Configuration optimisée de QueryClient
 const queryClient = new QueryClient({
@@ -39,17 +40,19 @@ const AppProviders = ({ children }) => {
         <ThemeProvider>
           <NotificationProvider>
             <AuthProvider>
-              <PostesProvider>
-                <SessionsProvider>
-                  <GamingCenterMapProvider>
-                    {children}
-                    {/* DevTools seulement en développement */}
-                    {import.meta.env.DEV && (
-                      <ReactQueryDevtools initialIsOpen={false} />
-                    )}
-                  </GamingCenterMapProvider>
-                </SessionsProvider>
-              </PostesProvider>
+              <PaymentProvider>
+                <PostesProvider>
+                  <SessionsProvider>
+                    <GamingCenterMapProvider>
+                      {children}
+                      {/* DevTools seulement en développement */}
+                      {import.meta.env.DEV && (
+                        <ReactQueryDevtools initialIsOpen={false} />
+                      )}
+                    </GamingCenterMapProvider>
+                  </SessionsProvider>
+                </PostesProvider>
+              </PaymentProvider>
             </AuthProvider>
           </NotificationProvider>
         </ThemeProvider>

@@ -1,55 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Calculator, CreditCard, Check } from 'lucide-react';
+import { X, Clock, Calculator, Check, AlertCircle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useTerminerSession } from '../../hooks/useSessions';
+import { useAjouterTransactionSession, useModifierTransaction, useSupprimerTransaction, useTransactionsBySession } from '../../hooks/useTransactions';
+import ConditionalPaymentSection from './ConditionalPaymentSection';
+import { getSessionPaymentStatus, sessionNeedsPaymentOnEnd, formatCurrency } from '../../utils/sessionPaymentUtils';
 
 const SimpleEndSessionModal = ({ isOpen, onClose, session, onSessionEnded }) => {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    modePaiement: 'ESPECES',
-    montantPaye: 0,
-    marquerCommePayee: true,
-    notes: ''
-  });
-
+  
   const { effectiveTheme } = useTheme();
   const { showSuccess, showError } = useNotification();
   const terminerSessionMutation = useTerminerSession();
+  const ajouterTransactionMutation = useAjouterTransactionSession();
+  const modifierTransactionMutation = useModifierTransaction();
+  const supprimerTransactionMutation = useSupprimerTransaction();
   const isDarkMode = effectiveTheme === 'dark';
 
-  // Utiliser directement le montant estimé stocké dans la session
+  // Récupérer les transactions réelles de cette session depuis l'API
+  const { 
+    data: transactionsData, 
+    isLoading: loadingTransactions,
+    refetch: refetchTransactions 
+  } = useTransactionsBySession(session?.id, {
+    enabled: !!session?.id && isOpen,
+    showError: false // Pas d'erreur affichée automatiquement
+  });
+
+  // ✅ SOLUTION INTELLIGENTE: Utiliser les utilitaires de détection de paiement
+  const paymentStatus = getSessionPaymentStatus(session);
+  const needsPaymentOnEnd = sessionNeedsPaymentOnEnd(session);
+  
+  // Pour les transactions API (données complémentaires)
+  const transactionsRaw = transactionsData?.data?.transactions || [];
+  
+  console.log('🔍 [MODAL_DEBUG] Détection paiement FINALE dans SimpleEndSessionModal:', {
+    sessionId: session?.id,
+    paymentStatus: {
+      status: paymentStatus.status,
+      actionRequired: paymentStatus.actionRequired,
+      needsPayment: paymentStatus.needsPayment,
+      isPaid: paymentStatus.isPaid,
+      montantTotal: paymentStatus.montantTotal,
+      montantPaye: paymentStatus.montantPaye,
+      resteAPayer: paymentStatus.resteAPayer
+    },
+    needsPaymentOnEnd,
+    transactionsCount: transactionsRaw.length,
+    isModalOpen: isOpen,
+    loadingTransactions
+  });
+
+  // Effet pour rafraîchir les transactions quand le modal s'ouvre
   useEffect(() => {
-    if (isOpen && session) {
-      console.log('🔄 [MODAL] Session data:', session);
-      
-      // Utiliser le montant calculé lors du démarrage de la session
-      const montantEstime = session.montantTotal || session.coutCalculeFinal || 0;
-      console.log('💰 [MODAL] Montant estimé utilisé:', montantEstime);
-      
-      setFormData(prev => ({
-        ...prev,
-        montantPaye: montantEstime
-      }));
+    if (isOpen && session?.id) {
+      console.log('🔄 [MODAL] Rafraîchissement transactions pour session:', session.id);
+      refetchTransactions();
     }
-  }, [isOpen, session]);
+  }, [isOpen, session?.id, refetchTransactions]);
+
+  // Gestionnaires pour les transactions
+  const handleTransactionAdded = async (transactionData) => {
+    const result = await ajouterTransactionMutation.mutateAsync(transactionData);
+    refetchTransactions(); // Rafraîchir les transactions après ajout
+    return result;
+  };
+
+  const handleTransactionUpdated = async (transactionId, transactionData) => {
+    const result = await modifierTransactionMutation.mutateAsync({ id: transactionId, data: transactionData });
+    refetchTransactions(); // Rafraîchir les transactions après modification
+    return result;
+  };
+
+  const handleTransactionDeleted = async (transactionId) => {
+    const result = await supprimerTransactionMutation.mutateAsync(transactionId);
+    refetchTransactions(); // Rafraîchir les transactions après suppression
+    return result;
+  };
 
   const handleTerminate = async () => {
+    if (needsPaymentOnEnd) {
+      showError('La session doit être entièrement payée avant d\'être terminée');
+      return;
+    }
+
     try {
       setLoading(true);
       
-      const terminationData = {
-        modePaiement: formData.modePaiement,
-        montantPaye: parseFloat(formData.montantPaye),
-        marquerCommePayee: formData.marquerCommePayee,
-        notes: formData.notes
-      };
-
-      console.log('🛑 [MODAL] Terminaison session:', session.id, terminationData);
+      console.log('🛑 [MODAL] Terminaison session:', session.id);
 
       await terminerSessionMutation.mutateAsync({
         sessionId: session.id,
-        ...terminationData
+        notes: 'Session terminée avec transactions gérées'
       });
 
       showSuccess('Session terminée avec succès');
@@ -73,10 +116,6 @@ const SimpleEndSessionModal = ({ isOpen, onClose, session, onSessionEnded }) => 
     return `${mins}min`;
   };
 
-  const formatCurrency = (amount) => {
-    return `${parseFloat(amount || 0).toFixed(2)} MAD`;
-  };
-
   // Calculer la durée de la session en cours
   const calculateCurrentDuration = () => {
     if (!session?.heureDebut) return 0;
@@ -85,15 +124,26 @@ const SimpleEndSessionModal = ({ isOpen, onClose, session, onSessionEnded }) => 
     return Math.floor((maintenant - debut) / (1000 * 60)); // en minutes
   };
 
-  // Récupérer le montant estimé de la session
-  const getMontantEstime = () => {
-    return session?.montantTotal || session?.coutCalculeFinal || 0;
-  };
-
   if (!isOpen || !session) return null;
 
-  const montantEstime = getMontantEstime();
   const dureeActuelle = calculateCurrentDuration();
+
+  // Afficher un spinner si les transactions sont en cours de chargement
+  if (loadingTransactions) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className={`
+          ${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}
+          rounded-xl shadow-2xl w-full max-w-md transform transition-all p-6
+        `}>
+          <div className="flex items-center justify-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span>Chargement des transactions...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -158,119 +208,23 @@ const SimpleEndSessionModal = ({ isOpen, onClose, session, onSessionEnded }) => 
                 </p>
               </div>
               <div>
-                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Type session:</span>
-                <p className="font-medium">{session.typeSession || 'Standard'}</p>
+                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Montant total:</span>
+                <p className="font-medium text-green-600 dark:text-green-400">
+                  {formatCurrency(paymentStatus.montantTotal)}
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Options de paiement */}
-          <div className="space-y-3">
-            <label className="block">
-              <span className="text-sm font-medium mb-2 block">Mode de paiement *</span>
-              <div className="grid grid-cols-2 gap-2">
-                {['ESPECES', 'CARTE', 'VIREMENT', 'CHEQUE'].map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setFormData(prev => ({ ...prev, modePaiement: mode }))}
-                    className={`
-                      p-3 rounded-lg border text-sm font-medium transition-all
-                      ${formData.modePaiement === mode
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                        : `border-gray-300 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-white hover:bg-gray-50'}`
-                      }
-                    `}
-                  >
-                    <CreditCard className="w-4 h-4 mx-auto mb-1" />
-                    {mode.charAt(0) + mode.slice(1).toLowerCase()}
-                  </button>
-                ))}
-              </div>
-            </label>
+          {/* Section de paiement intelligente */}
+          <ConditionalPaymentSection
+            session={session}
+            transactionsRaw={transactionsRaw}
+            onTransactionAdded={handleTransactionAdded}
+            onTransactionUpdated={handleTransactionUpdated}
+            onTransactionDeleted={handleTransactionDeleted}
+          />
 
-            <label className="block">
-              <span className="text-sm font-medium mb-2 block">Montant à payer (MAD) *</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.montantPaye}
-                onChange={(e) => setFormData(prev => ({ ...prev, montantPaye: e.target.value }))}
-                className={`
-                  w-full px-3 py-2 border rounded-lg text-lg font-medium
-                  ${isDarkMode 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-gray-900'
-                  }
-                  focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                `}
-              />
-              <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                Montant estimé selon le plan tarifaire: {formatCurrency(montantEstime)}
-              </p>
-            </label>
-
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                checked={formData.marquerCommePayee}
-                onChange={(e) => setFormData(prev => ({ ...prev, marquerCommePayee: e.target.checked }))}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm">Marquer comme entièrement payée</span>
-            </label>
-          </div>
-
-          {/* Résumé du paiement */}
-          <div className={`
-            ${isDarkMode ? 'bg-green-900 border-green-700' : 'bg-green-50 border-green-200'}
-            border rounded-lg p-4
-          `}>
-            <div className="flex items-center space-x-2 mb-2">
-              <Check className="w-4 h-4 text-green-600" />
-              <span className="font-medium text-green-600 dark:text-green-400">Résumé du paiement</span>
-            </div>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span>Montant estimé:</span>
-                <span className="font-medium">{formatCurrency(montantEstime)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Montant payé:</span>
-                <span className="font-medium text-blue-600 dark:text-blue-400">
-                  {formatCurrency(formData.montantPaye)}
-                </span>
-              </div>
-              <div className="flex justify-between font-medium">
-                <span>Reste à payer:</span>
-                <span className={
-                  (montantEstime - formData.montantPaye) <= 0 
-                    ? 'text-green-600' 
-                    : 'text-red-600'
-                }>
-                  {formatCurrency(Math.max(0, montantEstime - formData.montantPaye))}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <label className="block">
-            <span className="text-sm font-medium mb-2 block">Notes (optionnel)</span>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-              placeholder="Notes sur la session ou le paiement..."
-              rows={2}
-              className={`
-                w-full px-3 py-2 border rounded-lg
-                ${isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
-                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
-                }
-                focus:ring-2 focus:ring-blue-500 focus:border-transparent
-              `}
-            />
-          </label>
         </div>
 
         {/* Actions */}
@@ -292,15 +246,21 @@ const SimpleEndSessionModal = ({ isOpen, onClose, session, onSessionEnded }) => 
           >
             Annuler
           </button>
+          
+          {/* Bouton de terminaison avec logique intelligente */}
           <button
             onClick={handleTerminate}
-            disabled={loading}
-            className="
-              flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium 
-              hover:bg-red-700 transition-colors
-              disabled:opacity-50 disabled:cursor-not-allowed
+            disabled={loading || needsPaymentOnEnd}
+            className={`
+              flex-1 px-4 py-2 rounded-lg font-medium transition-colors
               flex items-center justify-center space-x-2
-            "
+              ${!needsPaymentOnEnd 
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+              }
+              disabled:opacity-50 disabled:cursor-not-allowed
+            `}
+            title={needsPaymentOnEnd ? 'La session doit être entièrement payée pour être terminée' : ''}
           >
             {loading ? (
               <>
@@ -310,7 +270,12 @@ const SimpleEndSessionModal = ({ isOpen, onClose, session, onSessionEnded }) => 
             ) : (
               <>
                 <Clock className="w-4 h-4" />
-                <span>Terminer la session</span>
+                <span>
+                  {needsPaymentOnEnd 
+                    ? `Paiement requis (${formatCurrency(paymentStatus.resteAPayer)})`
+                    : 'Terminer la session'
+                  }
+                </span>
               </>
             )}
           </button>

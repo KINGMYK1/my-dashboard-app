@@ -4,6 +4,11 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
 // import { useCalculerPrixSession } from '../hooks/useCalculerPrixSession'; // ✅ AJOUT
 import api from '../api/apiService';
+import { 
+  getSessionPaymentStatus, 
+  sessionNeedsPaymentOnEnd, 
+  isSessionPaidAtStart 
+} from '../utils/sessionPaymentUtils';
 
 // Helper function to invalidate relevant session caches
 const invalidateSessionCaches = (queryClient) => {
@@ -19,29 +24,39 @@ const invalidateSessionCaches = (queryClient) => {
 /**
  * ✅ CORRIGÉ: Hook pour récupérer les sessions actives (ancien nom maintenu)
  */
+// useSessions.js
 export function useSessionsActives() {
   const { showError } = useNotification();
-  const { translations } = useLanguage();
-
+  
   return useQuery({
-    queryKey: ['sessions', 'active'],
+    queryKey: ['sessions', 'actives'],
     queryFn: async () => {
-      try {
-        console.log('🎣 [HOOK] useSessionsActives appelé');
-        const response = await sessionService.getSessionsActives();
-        console.log('✅ [HOOK] Sessions actives récupérées:', response);
-        return response.data?.data || response.data || [];
-      } catch (error) {
-        console.error('❌ [HOOK] Erreur sessions actives:', error);
-        throw error;
-      }
+      console.log('🔄 [HOOK] Récupération sessions actives...');
+      
+      const response = await sessionService.getSessionsActives();
+      
+      // ✅ ENRICHIR les sessions avec calculs de paiement côté frontend
+      const sessionsEnrichies = (response.data || response || []).map(session => {
+        const paiementStatus = getSessionPaymentStatus(session);
+        
+        return {
+          ...session,
+          // Ajouter les informations de paiement calculées
+          paiementCalcule: paiementStatus,
+          needsPaymentOnEnd: sessionNeedsPaymentOnEnd(session),
+          isPaidAtStart: isSessionPaidAtStart(session)
+        };
+      });
+      
+      console.log('✅ [HOOK] Sessions actives enrichies:', sessionsEnrichies);
+      return sessionsEnrichies;
     },
-    staleTime: 10 * 1000, // 10 secondes
-    refetchInterval: 30 * 1000, // 30 secondes
-    retry: 2,
+    staleTime: 10000,
+    refetchInterval: 30000, // Actualiser toutes les 30s
+    refetchOnWindowFocus: false,
     onError: (error) => {
       console.error('❌ [HOOK] Erreur sessions actives:', error);
-      showError(error.message || translations?.errorLoadingSessions || 'Erreur lors du chargement des sessions actives');
+      showError('Erreur lors de la récupération des sessions actives');
     }
   });
 }
@@ -629,4 +644,105 @@ export function useSessionActions() {
     isPausing: pauseSession.isLoading,
     isResuming: resumeSession.isLoading
   };
+}
+
+/**
+ * ✅ NOUVEAU: Hook spécialisé pour démarrer des sessions avec abonnements
+ */
+export function useStartSessionWithSubscription() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useMutation({
+    mutationFn: async (sessionData) => {
+      // Validation des données
+      if (!sessionData.posteId || !sessionData.clientId) {
+        throw new Error('Poste et client requis pour une session avec abonnement');
+      }
+
+      console.log('🌟 [HOOK] Démarrage session avec abonnement:', sessionData);
+
+      // Préparer le payload pour l'API
+      const payload = {
+        posteId: parseInt(sessionData.posteId),
+        clientId: parseInt(sessionData.clientId),
+        dureeEstimeeMinutes: parseInt(sessionData.dureeEstimeeMinutes || 60),
+        typeSession: 'AVEC_ABONNEMENT',
+        forceUtiliserAbonnement: true,
+        planTarifaireUtilise: sessionData.planTarifaireUtilise || 'PLAN_TARIFAIRE'
+      };
+
+      // Ajouter l'abonnement spécifique si fourni
+      if (sessionData.abonnementId) {
+        payload.abonnementId = parseInt(sessionData.abonnementId);
+      }
+
+      // Ajouter les informations d'avantage si calculées côté frontend
+      if (sessionData.avantageAbonnement) {
+        payload.avantageAbonnement = sessionData.avantageAbonnement;
+      }
+
+      try {
+        const response = await api.post('/sessions', payload);
+        console.log('✅ [HOOK] Session avec abonnement créée:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('❌ [HOOK] Erreur session abonnement:', error.response?.data || error);
+        throw new Error(error.response?.data?.message || 'Erreur lors de la création de la session avec abonnement');
+      }
+    },
+    onSuccess: () => {
+      // Invalider les caches pour actualiser les données
+      invalidateSessionCaches(queryClient);
+      
+      // Également invalider les données d'abonnements si un abonnement a été consommé
+      queryClient.invalidateQueries({ queryKey: ['abonnements'] });
+      
+      showSuccess(
+        translations?.sessionWithSubscriptionStarted || 
+        'Session avec abonnement démarrée avec succès'
+      );
+    },
+    onError: (error) => {
+      console.error('❌ [HOOK] Erreur démarrage session abonnement:', error);
+      showError(
+        error.message || 
+        translations?.errorStartingSessionWithSubscription || 
+        'Erreur lors du démarrage de la session avec abonnement'
+      );
+    }
+  });
+}
+
+/**
+ * ✅ NOUVEAU: Hook pour calculer l'avantage d'un abonnement
+ */
+export function useCalculateSubscriptionBenefit() {
+  const { showError } = useNotification();
+
+  return useMutation({
+    mutationFn: async ({ abonnementId, dureeMinutes, posteId }) => {
+      console.log('🧮 [HOOK] Calcul avantage abonnement:', { abonnementId, dureeMinutes, posteId });
+
+      try {
+        const response = await api.post('/abonnements/calculer-avantage', {
+          abonnementId: parseInt(abonnementId),
+          dureeMinutes: parseInt(dureeMinutes),
+          posteId: parseInt(posteId)
+        });
+
+        console.log('✅ [HOOK] Avantage calculé:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('❌ [HOOK] Erreur calcul avantage:', error.response?.data || error);
+        throw new Error(error.response?.data?.message || 'Erreur lors du calcul de l\'avantage');
+      }
+    },
+    retry: false,
+    onError: (error) => {
+      console.error('❌ [HOOK] Erreur calcul avantage abonnement:', error);
+      showError(`Erreur calcul avantage: ${error.message}`);
+    }
+  });
 }

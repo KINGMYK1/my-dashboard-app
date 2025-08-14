@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useUpdatePayment } from '../../hooks/useTransactions';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Card, CardContent, CardHeader } from '../ui';
@@ -54,12 +54,21 @@ const TransactionManagementModal = ({ isOpen, onClose, transaction, onUpdate }) 
     }
   };
 
-  const calculatedData = {
-    montantTotal: parseFloat(transaction?.montantTotal || 0),
-    montantPaye: parseFloat(transaction?.montantPaye || 0),
-    resteAPayer: parseFloat(transaction?.resteAPayer || 0),
-    estPayee: transaction?.estPayee || false
-  };
+  // ✅ CORRECTION: Calculs mémorisés et fiables pour les données financières
+  const calculatedData = useMemo(() => {
+    const montantTotal = parseFloat(transaction?.montantTTC || transaction?.montantTotal || 0);
+    const montantPaye = parseFloat(transaction?.montantPaye || 0);
+    const resteAPayer = Math.max(0, montantTotal - montantPaye);
+    // Une transaction est payée si le reste à payer est (quasi) nul et que le montant total était positif.
+    const estPayee = resteAPayer <= 0.001 && montantTotal > 0;
+
+    return {
+      montantTotal,
+      montantPaye,
+      resteAPayer,
+      estPayee,
+    };
+  }, [transaction]);
 
   if (!isOpen || !transaction) return null;
 

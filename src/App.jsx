@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PaymentProvider } from './contexts/PaymentContext';
 
 // Contexts
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -16,7 +17,7 @@ import TwoFactorPage from './components/TwoFactorPage/TwoFactorPage';
 import Dashboard from './components/Dashboard/Dashboard';
 import SplashScreen from './components/SplashScreen/SplashScreen';
 import SessionExpiryAlert from './components/SessionExpiryAlert/SessionExpiryAlert';
-import Monitoring from './pages/Monitoring/Monitoring';
+import AppRoutes from './AppRoutes'; // ✅ AJOUT: Import AppRoutes
 
 // Créer un client React Query
 const queryClient = new QueryClient({
@@ -92,7 +93,9 @@ function App() {
           <QueryClientProvider client={queryClient}>
             <NotificationProvider>
               <SessionManager>
-                <AuthProvider>
+                <AuthProvider>        
+                        <PaymentProvider>
+                
                                 <MonitoringProvider> {/* ✅ AJOUT: Wrapper MonitoringProvider */}
 
                   <AuthStateManager>
@@ -103,13 +106,16 @@ function App() {
                       <Route path="/verify-2fa" element={<TwoFactorPage />} />
                       <Route path="/dashboard/*" element={
                         <ProtectedRoute>
-                          <Dashboard />
+                          <Dashboard>
+                            <AppRoutes />
+                          </Dashboard>
                         </ProtectedRoute>
                       } />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </AuthStateManager>
                              </MonitoringProvider> 
+              </PaymentProvider>
 
                 </AuthProvider>
 

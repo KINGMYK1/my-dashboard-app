@@ -50,7 +50,7 @@ export function useClientsEligibles(filters = {}) {
       ...filters,
       estActif: true, // Seulement les clients actifs
       includeSystem: false, // Exclure le client système
-      typeClient: 'NORMAL' // Seulement les clients normaux
+      typeClient: 'STANDARD' // Seulement les clients normaux
     }),
     staleTime: 2 * 60 * 1000, // 2 minutes
     retry: 2,
@@ -60,7 +60,7 @@ export function useClientsEligibles(filters = {}) {
       clients: (data?.data?.clients || []).filter(client => 
         client.estActif && 
         !client.isSystemClient && 
-        client.typeClient === 'NORMAL'
+        client.typeClient === 'STANDARD'
       )
     }),
     onError: (error) => {
@@ -81,7 +81,7 @@ export function useClientsSuggestions(searchTerm, limit = 5) {
       search: searchTerm,
       estActif: true,
       includeSystem: false,
-      typeClient: 'NORMAL',
+      typeClient: 'STANDARD',
       limit: limit
     }),
     enabled: !!searchTerm && searchTerm.length >= 2,
@@ -93,7 +93,7 @@ export function useClientsSuggestions(searchTerm, limit = 5) {
       clients: (data?.data?.clients || []).filter(client => 
         client.estActif && 
         !client.isSystemClient && 
-        client.typeClient === 'NORMAL'
+        client.typeClient === 'STANDARD'
       )
     }),
     onError: (error) => {

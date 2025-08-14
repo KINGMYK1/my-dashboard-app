@@ -539,7 +539,7 @@ class SessionService {
       resteAPayer: parseFloat(session.resteAPayer || 0),
       estPayee: session.estPayee === true || session.estPayee === 'true',
       modePaiement: session.modePaiement || null,
-      typeCalcul: session.typeCalcul || 'TARIF_LIBRE',
+      typeCalcul: session.typeCalcul || 'PLAN_TARIFAIRE',
       planTarifaireUtilise: session.planTarifaireUtilise || null,
       
       // Informations relationnelles

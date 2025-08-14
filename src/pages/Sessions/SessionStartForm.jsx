@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Play, Clock, User, Calculator, CreditCard, DollarSign, Check } from 'lucide-react';
+import { X, Play, Clock, User, Calculator, CreditCard, DollarSign, Check, Sparkles, AlertCircle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { usePayment } from '../../contexts/PaymentContext';
 import { useClients } from '../../hooks/useClients';
 import { useDemarrerSession } from '../../hooks/useSessions';
 import PricingService from '../../services/pricingService';
@@ -15,6 +16,7 @@ const SessionStartForm = ({
 }) => {
   const { effectiveTheme } = useTheme();
   const { showSuccess, showError } = useNotification();
+  const { marquerSessionPayee } = usePayment();
   const isDarkMode = effectiveTheme === 'dark';
 
   // ✅ États du formulaire
@@ -96,7 +98,7 @@ const SessionStartForm = ({
     }
   }, [open, preselectedPoste]);
 
-  // ✅ Calcul automatique du prix quand les paramètres changent
+  // ✅ Calcul automatique du prix UNIQUEMENT quand poste ou durée change
   useEffect(() => {
     if (formData.posteId && formData.dureeEstimeeMinutes > 0) {
       const timeoutId = setTimeout(() => {
@@ -107,7 +109,7 @@ const SessionStartForm = ({
     } else {
       setPrixCalcule(null);
     }
-  }, [formData.posteId, formData.dureeEstimeeMinutes]);
+  }, [formData.posteId, formData.dureeEstimeeMinutes]); // ✅ CORRECTION: Retirer calculerPrix des dépendances
 
   // ✅ Mise à jour automatique du montant payé pour le paiement anticipé
   useEffect(() => {
@@ -176,7 +178,24 @@ const SessionStartForm = ({
       console.log('📤 [SESSION_START_FORM] Envoi données:', sessionData);
       console.log('💰 [SESSION_START_FORM] Prix calculé:', prixCalcule);
 
-      await demarrerSessionMutation.mutateAsync(sessionData);
+      const result = await demarrerSessionMutation.mutateAsync(sessionData);
+      
+      // ✅ Si paiement anticipé, marquer la session comme payée dans le contexte
+      if (formData.paiementAnticipe && result) {
+        // Essayer différentes structures de réponse possibles
+        const sessionId = result.sessionId || result.data?.sessionId || result.data?.id || result.id;
+        
+        if (sessionId) {
+          console.log('💳 [SESSION_START_FORM] Marquage paiement anticipé session:', sessionId);
+          marquerSessionPayee(sessionId, {
+            montantPaye: parseFloat(formData.montantPaye),
+            modePaiement: formData.modePaiement,
+            marquerCommePayee: formData.marquerCommePayee
+          });
+        } else {
+          console.warn('⚠️ [SESSION_START_FORM] Impossible de récupérer ID session:', result);
+        }
+      }
       
       showSuccess('Session démarrée avec succès');
       if (onSessionStarted) onSessionStarted(sessionData, preselectedPoste);

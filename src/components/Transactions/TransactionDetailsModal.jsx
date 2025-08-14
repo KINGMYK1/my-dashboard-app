@@ -6,13 +6,12 @@ import Portal from '../Portal/Portal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
+import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const TransactionDetailsModal = ({ 
   isOpen, 
   onClose, 
-  transaction, 
-  formatCurrency, 
-  formatDate 
+  transaction
 }) => {
   const { effectiveTheme } = useTheme();
   const { translations } = useLanguage();

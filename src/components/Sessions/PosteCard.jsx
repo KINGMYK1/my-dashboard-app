@@ -8,6 +8,7 @@ import {
   Gamepad2,
   AlertCircle,
   CheckCircle,
+  Star,
   PauseCircle,
   Wrench,
   Euro,
@@ -285,13 +286,15 @@ const PosteCard = ({
       {/* Actions */}
       <div className="space-y-2">
         {statusInfo.available ? (
-          <button
-            onClick={() => onStartSession && onStartSession(poste)}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
-          >
-            <Play className="w-4 h-4" />
-            <span>Démarrer Session</span>
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => onStartSession && onStartSession(poste)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+            >
+              <Play className="w-4 h-4" />
+              <span>Démarrer Session</span>
+            </button>
+          </div>
         ) : statusInfo.session ? (
           <button
             onClick={() => onSessionAction && onSessionAction(statusInfo.session)}

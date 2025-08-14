@@ -6,6 +6,7 @@ import SessionPauseModal from './modals/SessionPauseModal';
 import SessionExtendModal from './modals/SessionExtendModal';
 import SessionTerminateModal from './modals/SessionTerminateModal';
 import SessionCancelModal from './modals/SessionCancelModal';
+import { getSessionPaymentStatus, sessionNeedsPaymentOnEnd, formatCurrency } from '../../utils/sessionPaymentUtils';
 
 const SessionActionsModal = ({ 
   session, 
@@ -19,6 +20,66 @@ const SessionActionsModal = ({
   const [activeSubModal, setActiveSubModal] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // ✅ Utiliser le calcul robuste du statut de paiement
+  const paymentStatus = getSessionPaymentStatus(session);
+  const needsPaymentOnEnd = sessionNeedsPaymentOnEnd(session);
+  
+  console.log('💰 [SESSION_ACTIONS] Détection finale:', {
+    sessionId: session?.id,
+    paymentStatus,
+    needsPaymentOnEnd,
+    actionRequired: paymentStatus.actionRequired,
+    originalData: {
+      montantTotal: session?.montantTotal,
+      montantPaye: session?.montantPaye,
+      estPayee: session?.estPayee
+    }
+  });
+
+  // ✅ Gestionnaire d'action "terminate" intelligent
+  const handleTerminateAction = async () => {
+    if (!session) return;
+
+    const sessionId = session.id;
+    if (!sessionId || isNaN(parseInt(sessionId))) {
+      console.error('❌ [SESSION_ACTIONS] ID de session invalide pour terminaison:', sessionId);
+      setErrors({ submit: 'ID de session invalide' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrors({});
+
+    try {
+      // ✅ CORRECTION CRITIQUE: Utiliser actionRequired pour déterminer le comportement
+      if (paymentStatus.actionRequired === 'TERMINER_DIRECTEMENT') {
+        // Session déjà payée → Terminer directement
+        console.log('✅ [SESSION_ACTIONS] Terminaison directe (session payée)');
+        
+        await onAction('terminer', parseInt(sessionId), {
+          modePaiement: session.modePaiement || 'ESPECES',
+          montantPaye: paymentStatus.montantTotal,
+          marquerCommePayee: true,
+          notes: 'Session terminée (déjà payée)'
+        });
+        
+        onClose(); // Fermer le modal après succès
+      } else {
+        // Session nécessite un paiement → Ouvrir sous-modal de terminaison
+        console.log('💳 [SESSION_ACTIONS] Ouverture modal paiement');
+        setActiveSubModal('terminate');
+      }
+    } catch (error) {
+      console.error('❌ [SESSION_ACTIONS] Erreur terminaison:', error);
+      setErrors({ submit: error.message || 'Erreur lors de la terminaison' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ✅ Actions conditionnelles basées sur le statut de paiement - Fonction retirée car non utilisée dans cette version
+  // La logique est maintenant directement dans le rendu du bouton "Terminer"
 
   // ✅ Utiliser directement le montant estimé stocké dans la session
   const montantEstime = React.useMemo(() => {
@@ -201,7 +262,15 @@ const SessionActionsModal = ({
       case 'extend':
         return <SessionExtendModal {...commonProps} />;
       case 'terminate':
-        return <SessionTerminateModal {...commonProps} />;
+        // ✅ CORRECTION: Ne montrer le sous-modal que si un paiement est nécessaire
+        if (paymentStatus.actionRequired !== 'TERMINER_DIRECTEMENT') {
+          return <SessionTerminateModal {...commonProps} />;
+        } else {
+          // Session déjà payée, on ne devrait pas arriver ici car le bouton fait une action directe
+          console.warn('⚠️ [SESSION_ACTIONS] Tentative d\'ouverture sous-modal pour session payée');
+          setActiveSubModal(null);
+          return null;
+        }
       case 'cancel':
         return <SessionCancelModal {...commonProps} />;
       default:
@@ -237,6 +306,52 @@ const SessionActionsModal = ({
 
           <div className="p-6 space-y-6">
             
+            {/* ✅ Affichage du statut de paiement */}
+            <div className={`p-4 rounded-lg border mb-4 ${
+              isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  💰 Statut de paiement:
+                </span>
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  paymentStatus.status === 'PAYE_COMPLET' 
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                    : paymentStatus.status === 'PAYE_PARTIEL'
+                    ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' 
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                }`}>
+                  {paymentStatus.statusMessage}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Montant total:</p>
+                  <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {formatCurrency(paymentStatus.montantTotal)}
+                  </p>
+                </div>
+                <div>
+                  <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Montant payé:</p>
+                  <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    {formatCurrency(paymentStatus.montantPaye)}
+                  </p>
+                </div>
+              </div>
+              
+              {paymentStatus.actionRequired === 'TERMINER_DIRECTEMENT' && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                  ✅ La session peut être terminée directement
+                </p>
+              )}
+              
+              {paymentStatus.resteAPayer > 0 && (
+                <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+                  ⚠️ Reste à payer: {formatCurrency(paymentStatus.resteAPayer)}
+                </p>
+              )}
+            </div>
             {/* Informations de la session */}
             <div className={`p-4 rounded-lg border ${
               isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
@@ -333,14 +448,25 @@ const SessionActionsModal = ({
 
             {/* Action principale: Terminer */}
             <div className="border-t pt-6">
-              <button
-                onClick={() => handleOpenSubModal('terminate')}
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-              >
-                <StopCircle className="w-5 h-5" />
-                <span>🏁 Terminer la session</span>
-              </button>
+              {paymentStatus.actionRequired === 'TERMINER_DIRECTEMENT' ? (
+                <button
+                  onClick={handleTerminateAction}
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  <StopCircle className="w-5 h-5" />
+                  <span>✅ Terminer la session (déjà payée)</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleOpenSubModal('terminate')}
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  <StopCircle className="w-5 h-5" />
+                  <span>💳 Terminer ({formatCurrency(paymentStatus.resteAPayer)} à payer)</span>
+                </button>
+              )}
             </div>
 
             {/* Erreur générale */}
@@ -366,5 +492,4 @@ const SessionActionsModal = ({
     </Portal>
   );
 };
-
 export default SessionActionsModal;

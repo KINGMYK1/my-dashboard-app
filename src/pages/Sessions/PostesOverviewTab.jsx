@@ -7,6 +7,7 @@ import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 const PostesOverviewTab = ({ 
   postes = [], 
   onStartSession, 
+  onStartSessionWithSubscription,
   onOpenSessionActions,
   getSessionProgress,
   formatCurrency,
@@ -129,6 +130,7 @@ const PostesOverviewTab = ({
             poste={poste}
             session={poste.sessionActive} // ✅ CORRECTION: Passer la session
             onStartSession={() => onStartSession && onStartSession(poste)}
+            onStartSessionWithSubscription={() => onStartSessionWithSubscription && onStartSessionWithSubscription(poste)}
             onSessionAction={(session) => onOpenSessionActions && onOpenSessionActions(session)} // ✅ CORRECTION
             formatCurrency={formatCurrency}
             formatDuration={formatDuration}

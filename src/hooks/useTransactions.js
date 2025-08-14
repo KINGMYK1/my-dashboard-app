@@ -194,31 +194,104 @@ export function useRefundTransaction() {
 }
 
 /**
- * ✅ Hook pour supprimer une transaction
+ * ✅ Hook pour modifier une transaction
  */
-export function useDeleteTransaction() {
+export function useModifierTransaction() {
   const queryClient = useQueryClient();
   const { showSuccess, showError } = useNotification();
   const { translations } = useLanguage();
 
   return useMutation({
-    mutationFn: (transactionId) => transactionService.deleteTransaction(transactionId),
+    mutationFn: ({ id, data }) => transactionService.modifierTransactionSimple(id, data),
     
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transaction', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['statistiques'] });
       
       showSuccess(
+        data.message || 
+        translations?.transactionUpdatedSuccess || 
+        'Transaction modifiée avec succès'
+      );
+    },
+    
+    onError: (error) => {
+      console.error('❌ [USE_MODIFIER_TRANSACTION] Erreur:', error);
+      showError(
+        error.message || 
+        translations?.transactionUpdateError || 
+        'Erreur lors de la modification de la transaction'
+      );
+    }
+  });
+}
+
+/**
+ * ✅ Hook pour supprimer une transaction
+ */
+export function useSupprimerTransaction() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useMutation({
+    mutationFn: (transactionId) => transactionService.supprimerTransaction(transactionId),
+    
+    onSuccess: (data, transactionId) => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['transaction', transactionId] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['statistiques'] });
+      
+      showSuccess(
+        data.message || 
         translations?.transactionDeletedSuccess || 
         'Transaction supprimée avec succès'
       );
     },
     
     onError: (error) => {
-      console.error('❌ [USE_DELETE_TRANSACTION] Erreur:', error);
+      console.error('❌ [USE_SUPPRIMER_TRANSACTION] Erreur:', error);
       showError(
         error.message || 
         translations?.transactionDeleteError || 
         'Erreur lors de la suppression de la transaction'
+      );
+    }
+  });
+}
+
+/**
+ * ✅ Hook pour ajouter une transaction à une session
+ */
+export function useAjouterTransactionSession() {
+  const queryClient = useQueryClient();
+  const { showSuccess, showError } = useNotification();
+  const { translations } = useLanguage();
+
+  return useMutation({
+    mutationFn: (transactionData) => transactionService.ajouterTransactionSession(transactionData),
+    
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['statistiques'] });
+      
+      showSuccess(
+        data.message || 
+        translations?.transactionAddedSuccess || 
+        'Transaction ajoutée avec succès'
+      );
+    },
+    
+    onError: (error) => {
+      console.error('❌ [USE_AJOUTER_TRANSACTION_SESSION] Erreur:', error);
+      showError(
+        error.message || 
+        translations?.transactionAddError || 
+        'Erreur lors de l\'ajout de la transaction'
       );
     }
   });
@@ -237,6 +310,27 @@ export function useSalesStatistics(filters = {}) {
     onError: (error) => {
       console.error('❌ [USE_SALES_STATISTICS] Erreur:', error);
       showError(error.message || 'Erreur lors du chargement des statistiques');
+    }
+  });
+}
+
+/**
+ * ✅ Hook pour récupérer les transactions d'une session spécifique
+ */
+export function useTransactionsBySession(sessionId, options = {}) {
+  const { showError } = useNotification();
+  
+  return useQuery({
+    queryKey: ['transactions', 'session', sessionId],
+    queryFn: () => transactionService.getTransactionsBySession(sessionId),
+    enabled: !!sessionId && (options.enabled !== false),
+    staleTime: 10000, // 10 secondes
+    cacheTime: 30000, // 30 secondes
+    onError: (error) => {
+      console.error('❌ [USE_TRANSACTIONS_SESSION] Erreur:', error);
+      if (options.showError !== false) {
+        showError(error.message || 'Erreur lors du chargement des transactions de la session');
+      }
     }
   });
 }

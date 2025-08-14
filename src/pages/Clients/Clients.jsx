@@ -194,7 +194,7 @@ const Clients = () => {
   const getTypeClientIcon = (type, isSystem) => {
     if (isSystem) return <ShieldCheck className="w-4 h-4 text-purple-500" />;
     switch (type) {
-      case 'NORMAL': return <Users className="w-4 h-4 text-blue-500" />;
+      case 'STANDARD': return <Users className="w-4 h-4 text-blue-500" />;
       case 'SYSTEM': return <ShieldCheck className="w-4 h-4 text-purple-500" />;
       default: return <Users className="w-4 h-4 text-blue-500" />;
     }
@@ -207,7 +207,7 @@ const Clients = () => {
       return `${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200`;
     }
     switch (type) {
-      case 'NORMAL':
+      case 'STANDARD':
         return `${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200`;
       case 'SYSTEM':
         return `${baseClasses} bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200`;
@@ -220,7 +220,7 @@ const Clients = () => {
   const getTypeClientLabel = (type, isSystem) => {
     if (isSystem) return translations?.systemClient || 'Système';
     switch (type) {
-      case 'NORMAL': return translations?.normalClient || 'Normal';
+      case 'STANDARD': return translations?.normalClient || 'STANDARD';
       case 'SYSTEM': return translations?.systemClient || 'Système';
       default: return type;
     }
@@ -310,7 +310,7 @@ const Clients = () => {
             className={`px-4 py-2 border ${inputBorderClass} rounded-lg ${inputBgClass} ${getTextColorClass(true)} focus:outline-none focus:ring-2 ${focusRingColorClass}`}
           >
             <option value="all">{translations?.allTypes || 'Tous les types'}</option>
-            <option value="NORMAL">{translations?.normalClient || 'Normal'}</option>
+            <option value="STANDARD">{translations?.normalClient || 'STANDARD'}</option>
             <option value="SYSTEM">{translations?.systemClient || 'Système'}</option>
           </select>
 

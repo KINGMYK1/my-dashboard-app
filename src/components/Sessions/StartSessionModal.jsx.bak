@@ -1,0 +1,589 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSessionActions, useStartSessionWithSubscription } from '../../hooks/useSessions';
+import { useClients } from '../../hooks/useClients';
+import { useAbonnements } from '../../hooks/useAbonnements';
+import PricingService from '../../services/pricingService';
+import { Star, Clock, CreditCard } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { useCalculerPrixSession } from '../../hooks/useCalculerPrixSession';
+
+const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
+  const [formData, setFormData] = useState({
+    dureeMinutes: 60,
+    clientId: null,
+    abonnementId: null,
+    notes: '',
+    paiementImmediat: false,
+    modePaiement: 'ESPECES',
+    montantPaye: 0,
+    utiliserAbonnement: false // Conserver pour la logique de session avec abonnement
+  });
+
+  const [prixEstime, setPrixEstime] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('normal'); // 'normal' ou 'abonnement'
+
+  const { startSession } = useSessionActions();
+  const startSessionWithSubscriptionMutation = useStartSessionWithSubscription();
+  const { data: clientsData } = useClients();
+  const { data: abonnementsData } = useAbonnements(formData.clientId);
+  
+  // S'assurer que clients est un tableau
+  const clients = useMemo(() => {
+    // Vérifier si clientsData existe et a une propriété clients
+    if (clientsData?.clients) return clientsData.clients;
+    // Vérifier si clientsData est directement un tableauct, useCallback, useMemo } from 'react';
+import { useSessionActions, useStartSessionWithSubscription } from '../../hooks/useSessions';
+import { useClients } from '../../hooks/useClients';
+import { useAbonnements } from '../../hooks/useAbonnements';
+import PricingService from '../../services/pricingService';
+import { Star, Clock, CreditCard } from 'lucide-react';
+
+const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
+  const [formData, setFormData] = useState({
+    dureeMinutes: 60,
+    clientId: null,
+    abonnementId: null,
+    notes: '',
+    paiementImmediat: false,
+    modePaiement: 'ESPECES',
+    montantPaye: 0,
+    utiliserAbonnement: false // Conserver pour la logique de session avec abonnement
+  });
+
+  const [prixEstime, setPrixEstime] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('normal'); // 'normal' ou 'abonnement'
+
+  const { startSession } = useSessionActions();
+  const startSessionWithSubscriptionMutation = useStartSessionWithSubscription();
+  const { data: clientsData } = useClients();
+  const { data: abonnementsData } = useAbonnements(formData.clientId);
+  
+  // S'assurer que clients est un tableau
+  const clients = useMemo(() => {
+    // Vérifier si clientsData existe et a une propriété clients
+    if (clientsData?.clients) return clientsData.clients;
+    // Vérifier si clientsData est directement un tableau
+    if (Array.isArray(clientsData)) return clientsData;
+    // Par défaut, retourner un tableau vide
+    return [];
+  }, [clientsData]);
+
+  // Abonnements actifs du client sélectionné
+  const abonnementsActifs = useMemo(() => {
+    if (!formData.clientId) return [];
+    
+    // Vérifier si abonnementsData existe et a une propriété abonnements
+    const abonnements = abonnementsData?.abonnements || 
+                        (Array.isArray(abonnementsData) ? abonnementsData : []);
+    
+    return abonnements.filter(abonnement => 
+      abonnement && 
+      abonnement.estActif && 
+      abonnement.heuresRestantes > 0 &&
+      new Date(abonnement.dateFinValidite) > new Date()
+    );
+  }, [formData.clientId, abonnementsData]);, useCallback, useMemo } from 'react';
+import { useSessionActions, useStartSessionWithSubscription } from '../../hooks/useSessions';
+import { useClients } from '../../hooks/useClients';
+import { useAbonnements } from '../../hooks/useAbonnements';
+import PricingService from '../../services/pricingService';
+import { Star, Clock, CreditCard } from 'lucide-react';
+
+const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
+  const [formData, setFormData] = useState({
+    dureeMinutes: 60,
+    clientId: null,
+    abonnementId: null,
+    notes: '',
+    paiementImmediat: false,
+    modePaiement: 'ESPECES',
+    montantPaye: 0,
+    utiliserAbonnement: false // Conserver pour la logique de session avec abonnement
+  });
+
+  const [prixEstime, setPrixEstime] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('normal'); // 'normal' ou 'abonnement'
+
+  const { startSession } = useSessionActions();
+  const { data: clientsData } = useClients();
+  
+  // S'assurer que clients est un tableau
+  const clients = React.useMemo(() => {
+    // Vérifier si clientsData existe et a une propriété clients
+    if (clientsData?.clients) return clientsData.clients;
+    // Vérifier si clientsData est directement un tableau
+    if (Array.isArray(clientsData)) return clientsData;
+    // Par défaut, retourner un tableau vide
+    return [];
+  }, [clientsData]);
+
+  // ✅ CALCUL DU PRIX EN TEMPS RÉEL - CORRIGÉ
+  const calculerPrixEstime = useCallback(async () => {
+    try {
+      if (!poste?.id || !formData.dureeMinutes) {
+        console.log('Données insuffisantes pour calculer le prix');
+        return;
+      }
+
+      setLoading(true);
+      
+      // Si un abonnement est sélectionné, calculer avec avantage
+      if (formData.utiliserAbonnement && formData.abonnementId) {
+        try {
+          console.log('💰 [PRICING] Calcul avec abonnement - ID:', formData.abonnementId);
+          const estimation = await PricingService.calculerPrixAvecAbonnement(
+            poste.id,
+            formData.dureeMinutes,
+            formData.abonnementId
+          );
+          
+          console.log('✅ [PRICING] Résultat calcul abonnement:', estimation);
+          
+          if (estimation) {
+            setPrixEstime(estimation);
+            
+            // Si gratuit avec abonnement, pas de paiement immédiat
+            if (estimation.prixFinal === 0) {
+              setFormData(prev => ({
+                ...prev,
+                paiementImmediat: false,
+                montantPaye: 0
+              }));
+            }
+          }
+        } catch (abonnementError) {
+          console.error('❌ [PRICING] Erreur lors du calcul avec abonnement:', abonnementError);
+          // Fallback au calcul normal en cas d'erreur
+          const estimation = await PricingService.calculerPrixEstime(
+            poste.id,
+            formData.dureeMinutes
+          );
+          
+          console.log('✅ [PRICING] Fallback calcul normal:', estimation);
+          
+          if (estimation && estimation.data) {
+            setPrixEstime({
+              tarifHoraire: estimation.data.tarifHoraire,
+              dureeHeures: formData.dureeMinutes / 60,
+              prixBase: estimation.data.montantTotal,
+              prixFinal: estimation.data.montantTotal,
+              reductions: []
+            });
+          }
+        }
+      } else {
+        // Calcul normal sans abonnement
+        console.log('💰 [PRICING] Calcul normal - Poste:', poste.id, 'Durée:', formData.dureeMinutes);
+        const estimation = await PricingService.calculerPrixEstime(
+          poste.id,
+          formData.dureeMinutes
+        );
+        
+        console.log('✅ [PRICING] Résultat calcul normal:', estimation);
+        
+        if (estimation && estimation.data) {
+          // Format attendu par l'interface
+          setPrixEstime({
+            tarifHoraire: estimation.data.tarifHoraire || poste.typePoste?.tarifHoraireBase,
+            dureeHeures: formData.dureeMinutes / 60,
+            prixBase: estimation.data.montantTotal,
+            prixFinal: estimation.data.montantTotal,
+            reductions: [],
+            planUtilise: estimation.data.planUtilise,
+            typeCalcul: estimation.data.typeCalcul,
+            details: estimation.data.details
+          });
+          
+          // Mettre à jour le montant payé si paiement immédiat
+          if (formData.paiementImmediat) {
+            setFormData(prev => ({
+              ...prev,
+              montantPaye: estimation.data.montantTotal
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ [PRICING] Erreur calcul prix:', error);
+      // En cas d'erreur, calculer un prix de base approximatif
+      if (poste?.typePoste?.tarifHoraireBase) {
+        const tarifHoraire = poste.typePoste.tarifHoraireBase;
+        const prixBase = (formData.dureeMinutes / 60) * tarifHoraire;
+        setPrixEstime({
+          tarifHoraire,
+          dureeHeures: formData.dureeMinutes / 60,
+          prixBase,
+          prixFinal: prixBase,
+          reductions: []
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [poste?.id, formData.dureeMinutes, formData.utiliserAbonnement, formData.abonnementId, formData.paiementImmediat, poste?.typePoste?.tarifHoraireBase]);
+
+  useEffect(() => {
+    if (poste?.id && formData.dureeMinutes > 0) {
+      calculerPrixEstime();
+    }
+  }, [calculerPrixEstime, poste?.id, formData.dureeMinutes]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      setLoading(true);
+      
+      // Décider quel type de session créer
+      if (formData.utiliserAbonnement && formData.abonnementId) {
+        // Session avec abonnement
+        const sessionData = {
+          posteId: poste.id,
+          clientId: formData.clientId,
+          dureeEstimeeMinutes: formData.dureeMinutes,
+          abonnementId: formData.abonnementId,
+          notes: formData.notes,
+          typeSession: 'AVEC_ABONNEMENT'
+        };
+
+        console.log('🌟 [SESSION] Démarrage session avec abonnement:', sessionData);
+        const result = await startSessionWithSubscriptionMutation.mutateAsync(sessionData);
+        
+        if (result) {
+          console.log('✅ [SESSION] Session avec abonnement démarrée:', result);
+          onSessionStarted?.(result);
+          onClose();
+        }
+      } else {
+        // Session normale
+        const sessionData = {
+          posteId: poste.id,
+          dureeMinutes: formData.dureeMinutes,
+          clientId: formData.clientId,
+          notes: formData.notes,
+          paiementImmediat: formData.paiementImmediat,
+          modePaiement: formData.paiementImmediat ? formData.modePaiement : null,
+          montantPaye: formData.paiementImmediat ? formData.montantPaye : 0
+        };
+
+        console.log('🚀 [SESSION] Démarrage session normale:', sessionData);
+        const result = await startSession(sessionData);
+        
+        if (result && result.success) {
+          console.log('✅ [SESSION] Session normale démarrée:', result.data);
+          onSessionStarted?.(result.data);
+          onClose();
+        }
+      }
+    } catch (error) {
+      console.error('❌ [SESSION] Erreur démarrage session:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg">
+        <h2 className="text-xl font-bold mb-4">Démarrer Session - {poste?.nom}</h2>
+        
+        {/* Onglets */}
+        <div className="flex mb-6 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('normal');
+              setFormData(prev => ({ ...prev, utiliserAbonnement: false, abonnementId: null }));
+            }}
+            className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'normal'
+                ? 'bg-white dark:bg-gray-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
+            }`}
+          >
+            <Clock size={16} />
+            Session normale
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('abonnement');
+              setFormData(prev => ({ ...prev, utiliserAbonnement: true }));
+            }}
+            className={`flex-1 py-2 px-4 rounded-md font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'abonnement'
+                ? 'bg-white dark:bg-gray-600 text-green-600 dark:text-green-400 shadow-sm'
+                : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100'
+            }`}
+          >
+            <Star size={16} />
+            Avec abonnement
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Durée estimée */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Durée estimée (minutes)
+            </label>
+            <input
+              type="number"
+              min="15"
+              max="480"
+              step="15"
+              value={formData.dureeMinutes}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                dureeMinutes: parseInt(e.target.value)
+              }))}
+              className="w-full p-2 border rounded-lg"
+              required
+            />
+          </div>
+
+          {/* Client (obligatoire pour abonnement) */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Client {activeTab === 'abonnement' && <span className="text-red-500">*</span>}
+            </label>
+            <select
+              value={formData.clientId || ''}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                clientId: e.target.value ? parseInt(e.target.value) : null,
+                abonnementId: null // Reset abonnement quand le client change
+              }))}
+              className="w-full p-2 border rounded-lg"
+              required={activeTab === 'abonnement'}
+            >
+              <option value="">
+                {activeTab === 'abonnement' ? 'Sélectionner un client' : 'Aucun client'}
+              </option>
+              {clients?.map(client => (
+                <option key={client.id} value={client.id}>
+                  {client.prenom} {client.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sélection abonnement (si mode abonnement) */}
+          {activeTab === 'abonnement' && formData.clientId && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Abonnement <span className="text-red-500">*</span>
+              </label>
+              {abonnementsActifs.length === 0 ? (
+                <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    Ce client n'a pas d'abonnement actif. Vous pouvez créer une session normale.
+                  </p>
+                </div>
+              ) : (
+                <select
+                  value={formData.abonnementId || ''}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    abonnementId: e.target.value ? parseInt(e.target.value) : null
+                  }))}
+                  className="w-full p-2 border rounded-lg"
+                  required={activeTab === 'abonnement'}
+                >
+                  <option value="">Sélectionner un abonnement</option>
+                  {abonnementsActifs.map(abonnement => (
+                    <option key={abonnement.id} value={abonnement.id}>
+                      {abonnement.TypeAbonnement?.nom} - {abonnement.heuresRestantes}h restantes
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Estimation de prix */}
+          {prixEstime && (
+            <div className={`p-3 rounded-lg ${
+              formData.utiliserAbonnement && prixEstime.prixFinal === 0
+                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700'
+                : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700'
+            }`}>
+              <h3 className={`font-semibold mb-2 flex items-center gap-2 ${
+                formData.utiliserAbonnement && prixEstime.prixFinal === 0
+                  ? 'text-green-800 dark:text-green-200'
+                  : 'text-blue-800 dark:text-blue-200'
+              }`}>
+                {formData.utiliserAbonnement && prixEstime.prixFinal === 0 ? (
+                  <>
+                    <Star size={16} />
+                    Session gratuite avec abonnement
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={16} />
+                    Estimation du prix
+                  </>
+                )}
+              </h3>
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span>Tarif horaire:</span>
+                  <span>{prixEstime?.tarifHoraire || 0} MAD/h</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Durée:</span>
+                  <span>{(prixEstime?.dureeHeures || (formData.dureeMinutes / 60)).toFixed(2)}h</span>
+                </div>
+                {!formData.utiliserAbonnement || (prixEstime && prixEstime.prixFinal > 0) ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Prix de base:</span>
+                      <span>{(prixEstime?.prixBase || prixEstime?.prixFinal || 0).toFixed(2)} MAD</span>
+                    </div>
+                    {prixEstime?.reductions && Array.isArray(prixEstime.reductions) && prixEstime.reductions.length > 0 && (
+                      prixEstime.reductions.map((reduction, index) => (
+                        <div key={index} className="flex justify-between text-green-600">
+                          <span>- {reduction.nom || 'Réduction'}:</span>
+                          <span>-{(reduction.montant || 0).toFixed(2)} MAD</span>
+                        </div>
+                      ))
+                    )}
+                    <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                      <span>Prix final:</span>
+                      <span>{(prixEstime?.prixFinal || 0).toFixed(2)} MAD</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-medium">
+                    <Star size={16} />
+                    <span>Heures d'abonnement utilisées - Session gratuite</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Option paiement immédiat (seulement pour sessions payantes) */}
+          {(!formData.utiliserAbonnement || (prixEstime && prixEstime.prixFinal > 0)) && (
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="paiementImmediat"
+                  checked={formData.paiementImmediat}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    paiementImmediat: e.target.checked,
+                    montantPaye: e.target.checked ? (prixEstime?.prixFinal || 0) : 0
+                  }))}
+                  className="rounded"
+                />
+                <label htmlFor="paiementImmediat" className="text-sm">
+                  Effectuer le paiement maintenant
+                </label>
+              </div>
+
+              {/* Options de paiement */}
+              {formData.paiementImmediat && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Mode de paiement
+                    </label>
+                    <select
+                      value={formData.modePaiement}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        modePaiement: e.target.value
+                      }))}
+                      className="w-full p-2 border rounded-lg text-sm"
+                    >
+                      <option value="ESPECES">Espèces</option>
+                      <option value="CARTE">Carte bancaire</option>
+                      <option value="VIREMENT">Virement</option>
+                      <option value="CHEQUE">Chèque</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Montant payé (MAD)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formData.montantPaye}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        montantPaye: parseFloat(e.target.value) || 0
+                      }))}
+                      className="w-full p-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Notes (optionnel)
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                notes: e.target.value
+              }))}
+              className="w-full p-2 border rounded-lg h-20 resize-none"
+              placeholder="Informations supplémentaires..."
+            />
+          </div>
+
+          {/* Boutons d'action */}
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={loading || (activeTab === 'abonnement' && (!formData.clientId || !formData.abonnementId))}
+              className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                loading || (activeTab === 'abonnement' && (!formData.clientId || !formData.abonnementId))
+                  ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                  : activeTab === 'abonnement'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Démarrage...
+                </>
+              ) : (
+                <>
+                  {activeTab === 'abonnement' ? <Star size={16} /> : <Clock size={16} />}
+                  Démarrer la session
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default StartSessionModal;

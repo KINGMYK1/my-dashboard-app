@@ -137,5 +137,9 @@
   "processing": "Traitement en cours...",
   "processingCreate": "Création...",
   "processingUpdate": "Modification...",
-  "thisActionCannot": "Cette action est irréversible."
+  "thisActionCannot": "Cette action est irréversible.",
+  "sessions": "Sessions",
+  "transactions": "Transactions",
+  "transactionStats": "Statistiques Transactions",
+  "transactionManagement": "Gestion des Transactions"
 }

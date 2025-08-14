@@ -24,6 +24,36 @@ class PricingService {
   }
 
   /**
+   * ✅ NOUVEAU: CALCUL DU PRIX AVEC AVANTAGE ABONNEMENT
+   */
+  static async calculerPrixAvecAbonnement(posteId, dureeMinutes, abonnementId) {
+    try {
+      console.log(`🌟 [PRICING] Calcul prix avec abonnement - Poste: ${posteId}, Durée: ${dureeMinutes}min, Abonnement: ${abonnementId}`);
+
+      const response = await api.post('/sessions/calculer-prix', {
+        posteId,
+        dureeMinutes,
+        abonnementId,
+        utiliserAbonnement: true
+      });
+
+      console.log('✅ [PRICING] Prix avec abonnement calculé:', response);
+      
+      // Retourner une structure enrichie avec informations abonnement
+      return {
+        ...response,
+        avecAbonnement: true,
+        economieRealisee: response.economieAbonnement || 0,
+        heuresConsommees: dureeMinutes / 60
+      };
+
+    } catch (error) {
+      console.error('❌ [PRICING] Erreur calcul prix avec abonnement:', error);
+      throw error;
+    }
+  }
+
+  /**
    * ✅ VÉRIFIER LE STATUT DE PAIEMENT D'UNE SESSION
    */
   static async verifierStatutPaiement(sessionId) {

@@ -157,6 +157,288 @@ class StatistiquesService {
   }
 
   /**
+   * ✅ NOUVEAU: Obtenir les statistiques avancées des transactions avec calculs corrects
+   */
+  async getAdvancedTransactionStatistics(filtres = {}) {
+    try {
+      console.log('📊 [STATS_SERVICE] Statistiques avancées transactions:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.dateDebut) params.append('dateDebut', filtres.dateDebut);
+      if (filtres.dateFin) params.append('dateFin', filtres.dateFin);
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.groupBy) params.append('groupBy', filtres.groupBy);
+      if (filtres.includeComparison) params.append('includeComparison', filtres.includeComparison);
+      
+      const response = await apiService.get(`/transactions/statistiques/advanced?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur statistiques avancées:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Obtenir le chiffre d'affaires détaillé avec calculs corrects
+   */
+  async getDetailedChiffreAffaires(filtres = {}) {
+    try {
+      console.log('💰 [STATS_SERVICE] Chiffre d\'affaires détaillé:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.dateDebut) params.append('dateDebut', filtres.dateDebut);
+      if (filtres.dateFin) params.append('dateFin', filtres.dateFin);
+      if (filtres.groupBy) params.append('groupBy', filtres.groupBy);
+      if (filtres.includeBreakdown) params.append('includeBreakdown', 'true');
+      if (filtres.includeTrends) params.append('includeTrends', 'true');
+      
+      const response = await apiService.get(`/finances/chiffre-affaires/detailed?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur CA détaillé:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Obtenir les tendances des transactions
+   */
+  async getTransactionTrends(filtres = {}) {
+    try {
+      console.log('📈 [STATS_SERVICE] Tendances transactions:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.groupBy) params.append('groupBy', filtres.groupBy);
+      if (filtres.includeForecast) params.append('includeForecast', 'true');
+      
+      const response = await apiService.get(`/transactions/trends?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur tendances:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Comparaison de périodes pour les transactions
+   */
+  async getTransactionComparison(filtres = {}) {
+    try {
+      console.log('🔄 [STATS_SERVICE] Comparaison transactions:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periodeActuelle) params.append('periodeActuelle', filtres.periodeActuelle);
+      if (filtres.periodeComparaison) params.append('periodeComparaison', filtres.periodeComparaison);
+      if (filtres.metriques) params.append('metriques', filtres.metriques.join(','));
+      
+      const response = await apiService.get(`/transactions/comparison?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur comparaison:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Métriques financières avancées
+   */
+  async getAdvancedFinancialMetrics(filtres = {}) {
+    try {
+      console.log('📊 [STATS_SERVICE] Métriques financières avancées:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.includeMargins) params.append('includeMargins', 'true');
+      if (filtres.includeKPI) params.append('includeKPI', 'true');
+      if (filtres.includeForecast) params.append('includeForecast', 'true');
+      
+      const response = await apiService.get(`/finances/metrics/advanced?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur métriques financières:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Alertes financières basées sur des seuils
+   */
+  async getFinancialAlerts(seuils = {}) {
+    try {
+      console.log('🚨 [STATS_SERVICE] Alertes financières:', seuils);
+      
+      const params = new URLSearchParams();
+      if (seuils.caMinimum) params.append('caMinimum', seuils.caMinimum);
+      if (seuils.margeMinimum) params.append('margeMinimum', seuils.margeMinimum);
+      if (seuils.baisseCAToleree) params.append('baisseCAToleree', seuils.baisseCAToleree);
+      
+      const response = await apiService.get(`/finances/alerts?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur alertes financières:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Statistiques correctes des postes
+   */
+  async getCorrectPosteStatistics(filtres = {}) {
+    try {
+      console.log('🎮 [STATS_SERVICE] Statistiques correctes postes:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.dateDebut) params.append('dateDebut', filtres.dateDebut);
+      if (filtres.dateFin) params.append('dateFin', filtres.dateFin);
+      if (filtres.includeInactifs) params.append('includeInactifs', filtres.includeInactifs);
+      if (filtres.groupByType) params.append('groupByType', filtres.groupByType);
+      
+      const response = await apiService.get(`/postes/statistiques/correct?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur stats correctes postes:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Taux d'occupation réels des postes
+   */
+  async getPosteOccupationRates(filtres = {}) {
+    try {
+      console.log('📊 [STATS_SERVICE] Taux occupation postes:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.granularite) params.append('granularite', filtres.granularite); // heure, jour, semaine
+      if (filtres.heuresOuverture) params.append('heuresOuverture', JSON.stringify(filtres.heuresOuverture));
+      
+      const response = await apiService.get(`/postes/occupation/rates?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur taux occupation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Revenus par poste avec détails
+   */
+  async getPosteRevenues(filtres = {}) {
+    try {
+      console.log('💰 [STATS_SERVICE] Revenus par poste:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.includeOperatingCosts) params.append('includeOperatingCosts', 'true');
+      if (filtres.includeProfitability) params.append('includeProfitability', 'true');
+      
+      const response = await apiService.get(`/postes/revenues?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur revenus postes:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Comparaison de performance entre postes
+   */
+  async getPostePerformanceComparison(filtres = {}) {
+    try {
+      console.log('🏆 [STATS_SERVICE] Comparaison performance postes:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.metriques) params.append('metriques', filtres.metriques.join(','));
+      if (filtres.includeRanking) params.append('includeRanking', 'true');
+      
+      const response = await apiService.get(`/postes/performance/comparison?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur comparaison performance:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Analyse des heures de pointe par poste
+   */
+  async getPostePeakHours(filtres = {}) {
+    try {
+      console.log('⏰ [STATS_SERVICE] Heures de pointe postes:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.granularite) params.append('granularite', filtres.granularite);
+      if (filtres.seuil) params.append('seuil', filtres.seuil); // Seuil pour définir les heures de pointe
+      
+      const response = await apiService.get(`/postes/peak-hours?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur heures de pointe:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Analyse des sessions par poste spécifique
+   */
+  async getSessionAnalysisByPoste(posteId, filtres = {}) {
+    try {
+      console.log('🎯 [STATS_SERVICE] Analyse sessions par poste:', posteId, filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.periode) params.append('periode', filtres.periode);
+      if (filtres.includeTemporalAnalysis) params.append('includeTemporalAnalysis', 'true');
+      if (filtres.includeProfitability) params.append('includeProfitability', 'true');
+      if (filtres.includeComparison) params.append('includeComparison', 'true');
+      
+      const response = await apiService.get(`/postes/${posteId}/sessions/analysis?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur analyse sessions poste:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NOUVEAU: Analyse de maintenance et optimisation des postes
+   */
+  async getPosteMaintenanceAnalysis(filtres = {}) {
+    try {
+      console.log('🔧 [STATS_SERVICE] Analyse maintenance postes:', filtres);
+      
+      const params = new URLSearchParams();
+      if (filtres.includePerformanceDegradation) params.append('includePerformanceDegradation', 'true');
+      if (filtres.includeOptimizationSuggestions) params.append('includeOptimizationSuggestions', 'true');
+      if (filtres.alertThreshold) params.append('alertThreshold', filtres.alertThreshold);
+      
+      const response = await apiService.get(`/postes/maintenance/analysis?${params.toString()}`);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur analyse maintenance:', error);
+      throw error;
+    }
+  }
+
+  /**
    * ✅ Formater une devise
    */
   formatCurrency(amount, currency = 'MAD') {
@@ -186,6 +468,43 @@ class StatistiquesService {
       return valeurActuelle > 0 ? 100 : 0;
     }
     return ((valeurActuelle - valeurPrecedente) / valeurPrecedente) * 100;
+  }
+
+  /**
+   * ✅ TEMPORAIRE: Récupérer l'évolution du chiffre d'affaires
+   * Fonction manquante ajoutée pour corriger le bug
+   */
+  async obtenirEvolutionChiffreAffaires(filtres = {}) {
+    try {
+      console.log('📊 [STATS_SERVICE] Récupération évolution chiffre d\'affaires:', filtres);
+      
+      // Utiliser getDetailedChiffreAffaires en attendant
+      const response = await this.getDetailedChiffreAffaires(filtres);
+      
+      // Adapter la réponse au format attendu
+      const evolutionData = {
+        data: {
+          evolution: response?.data?.evolution || [],
+          total: response?.data?.total || 0,
+          variation: response?.data?.variation || 0
+        }
+      };
+      
+      console.log('✅ [STATS_SERVICE] Évolution chiffre d\'affaires récupérée:', evolutionData);
+      return evolutionData;
+      
+    } catch (error) {
+      console.error('❌ [STATS_SERVICE] Erreur évolution chiffre d\'affaires:', error);
+      
+      // Retourner des données vides en cas d'erreur pour éviter le crash
+      return {
+        data: {
+          evolution: [],
+          total: 0,
+          variation: 0
+        }
+      };
+    }
   }
 }
 

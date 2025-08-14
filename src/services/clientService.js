@@ -67,8 +67,8 @@ class ClientService {
         jeuxPreferes: Array.isArray(clientData.jeuxPreferes) ? clientData.jeuxPreferes : [],
         notes: clientData.notes?.trim() || null,
         sourceAcquisition: clientData.sourceAcquisition?.trim() || null,
-        // ✅ Nouveaux champs - toujours NORMAL pour les clients créés via l'interface
-        typeClient: 'NORMAL',
+        // ✅ Nouveaux champs - toujours STANDARD pour les clients créés via l'interface
+        typeClient: 'STANDARD',
         isSystemClient: false,
         estActif: clientData.estActif !== undefined ? clientData.estActif : true
       };
