@@ -4,6 +4,7 @@ import { useClients } from '../../hooks/useClients';
 import { useAbonnements } from '../../hooks/useAbonnements';
 import { useNotification } from '../../contexts/NotificationContext';
 import { usePayment } from '../../contexts/PaymentContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import PricingService from '../../services/pricingService';
 import { Star, Clock, CreditCard, DollarSign, Check, AlertCircle, User } from 'lucide-react';
 import { format } from 'date-fns';
@@ -30,6 +31,38 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
   const { marquerSessionPayee } = usePayment();
   const { data: clientsData } = useClients();
   const { data: abonnementsData } = useAbonnements();
+  const { effectiveTheme } = useTheme();
+  const isDarkMode = effectiveTheme === 'dark';
+
+  const selectClasses = `w-full px-3 py-2 border rounded-md appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
+    isDarkMode
+      ? 'bg-gray-700 border-gray-600 text-gray-100'
+      : 'bg-gray-50 border-gray-300 text-gray-900'
+  }`;
+
+  const inputClasses = `w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
+    isDarkMode
+      ? 'bg-gray-700 border-gray-600 text-gray-100'
+      : 'bg-gray-50 border-gray-300 text-gray-900'
+  }`;
+
+  const smallInputClasses = `w-20 px-3 py-1 border rounded-md focus:ring-2 focus:ring-blue-500 transition ${
+    isDarkMode
+      ? 'bg-gray-700 border-gray-600 text-gray-100'
+      : 'bg-gray-50 border-gray-300 text-gray-900'
+  }`;
+
+  const paymentInputClasses = `w-full px-3 py-2 border rounded-md text-lg font-semibold focus:ring-2 focus:ring-green-500 transition ${
+    isDarkMode
+      ? 'bg-gray-700 border-gray-600 text-gray-100'
+      : 'bg-gray-50 border-gray-300 text-gray-900'
+  }`;
+
+  const paymentSelectClasses = `w-full px-3 py-2 border rounded-md appearance-none focus:ring-2 focus:ring-green-500 transition ${
+    isDarkMode
+      ? 'bg-gray-700 border-gray-600 text-gray-100'
+      : 'bg-gray-50 border-gray-300 text-gray-900'
+  }`;
   
   // Traitement des données clients
   const clients = useMemo(() => {
@@ -302,7 +335,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                   {/* Liste déroulante améliorée avec indication d'abonnement */}
                   <div className="relative">
                     <select 
-                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={selectClasses}
                       value={selectedClient?.id || ""}
                       onChange={(e) => {
                         const clientId = e.target.value;
@@ -514,7 +547,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                       step="5"
                       value={duration}
                       onChange={(e) => setDuration(parseInt(e.target.value) || 60)}
-                      className="w-20 px-3 py-1 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                      className={smallInputClasses}
                     />
                   </div>
                 </div>
@@ -532,7 +565,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                       type="datetime-local"
                       value={format(startTime, "yyyy-MM-dd'T'HH:mm")}
                       onChange={(e) => setStartTime(new Date(e.target.value))}
-                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                      className={inputClasses}
                     />
                   </div>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 pl-1">
@@ -698,7 +731,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                     <select
                       value={modePaiement}
                       onChange={(e) => setModePaiement(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-green-500"
+                      className={paymentSelectClasses}
                     >
                       <option value="ESPECES">💵 Espèces</option>
                       <option value="CARTE">💳 Carte</option>
@@ -722,7 +755,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                       max={prixCalcule.montantTotal * 1.5}
                       value={montantPaye}
                       onChange={(e) => setMontantPaye(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 text-lg font-semibold focus:ring-2 focus:ring-green-500"
+                      className={paymentInputClasses}
                     />
                     <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                       Montant estimé: {prixCalcule.montantTotal.toFixed(2)} DH
