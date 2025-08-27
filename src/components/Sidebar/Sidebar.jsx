@@ -143,60 +143,18 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
       submenuKey: 'analytics',
       children: [
         {
-          icon: <BarChart3 size={18} />,
-          label: translations.detailedStatistics || 'Vue d\'ensemble',
-          path: '/dashboard/statistiques',
-          permission: 'SESSIONS_VIEW'
-        },
-        {
-          icon: <Monitor size={18} />,
-          label: translations.dashboardPostes || 'Dashboard Postes',
-          path: '/dashboard/statistiques/dashboard-postes',
-          permission: 'SESSIONS_VIEW'
-        },
-        {
-          icon: <Gamepad2 size={18} />,
-          label: 'Statistiques Postes',
-          path: '/dashboard/statistiques/postes',
-          permission: 'SESSIONS_VIEW'
-        },
-        {
           icon: <DollarSign size={18} />,
           label: translations.transactionStats || 'Statistiques Transactions',
           path: '/dashboard/statistiques/transactions',
           permission: 'SESSIONS_VIEW'
-        },
-        {
-          icon: <Calendar size={18} />,
-          label: translations.sessionHistory || 'Historique Sessions',
-          path: '/dashboard/statistiques/historique-sessions',
-          permission: 'SESSIONS_VIEW'
-        },
-        {
-          icon: <TrendingUp size={18} />,
-          label: 'Chiffre d\'Affaires',
-          path: '/dashboard/statistiques/chiffre-affaires',
-          permission: 'SESSIONS_VIEW'
         }
       ]
-    },
-    { 
-      icon: <ShoppingCart size={20} />, 
-      label: translations.pointOfSale || 'Point de Vente', 
-      path: '/dashboard/ventes',
-      permission: 'SALES_VIEW' 
     },
     { 
       icon: <Package size={20} />, 
       label: translations.inventory || 'Inventaire', 
       path: '/dashboard/inventaire',
       permission: 'INVENTORY_VIEW' 
-    },
-    { 
-      icon: <Calendar size={20} />, 
-      label: translations.events || 'Événements', 
-      path: '/dashboard/evenements',
-      permission: 'EVENTS_VIEW' 
     },
     // ✅ Ajouter cette section statistiques à votre sidebar existant
     // {
