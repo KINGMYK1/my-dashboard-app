@@ -150,12 +150,6 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
         }
       ]
     },
-    { 
-      icon: <Package size={20} />, 
-      label: translations.inventory || 'Inventaire', 
-      path: '/dashboard/inventaire',
-      permission: 'INVENTORY_VIEW' 
-    },
     // ✅ Ajouter cette section statistiques à votre sidebar existant
     // {
     //   title: 'Statistiques',
@@ -232,19 +226,6 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
       path: '/dashboard/permissions'
     }] : []),
     
-    // ✅ Dépenses - Permissions multiples possibles
-    ...(hasPermission('FINANCE_VIEW') || hasPermission('EXPENSES_VIEW') || hasPermission('ADMIN') ? [{ 
-      icon: <DollarSign size={20} />, 
-      label: translations.expenses || 'Dépenses', 
-      path: '/dashboard/depenses'
-    }] : []),
-    
-    // ✅ Rapports - ADMIN uniquement généralement
-    ...(hasPermission('REPORTS_VIEW') || hasPermission('ADMIN') ? [{ 
-      icon: <BarChart3 size={20} />, 
-      label: translations.reports || 'Rapports', 
-      path: '/dashboard/rapports'
-    }] : []),
     
     // ✅ Monitoring - MONITORING_VIEW ou ADMIN
     ...(hasPermission('MONITORING_VIEW') || hasPermission('ADMIN') ? [{
