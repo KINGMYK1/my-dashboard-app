@@ -23,8 +23,6 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
   const [montantPaye, setMontantPaye] = useState('');
   const [modePaiement, setModePaiement] = useState('ESPECES');
   const [marquerCommePayee, setMarquerCommePayee] = useState(false);
-  const [jeuPrincipal, setJeuPrincipal] = useState('');
-  const [notes, setNotes] = useState('');
   
   const { startSession } = useSessionActions();
   const { startSessionWithSubscription } = useStartSessionWithSubscription();
@@ -46,10 +44,6 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
   const inputClass = `w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
     isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-gray-50 border-gray-300 text-gray-900'
   }`;
-
-  const textareaClass = `w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
-    isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-gray-50 border-gray-300 text-gray-900'
-  } min-h-[80px]`;
 
   const selectClass = `w-full px-3 py-2 border rounded-md appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${
     isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-100' : 'bg-gray-50 border-gray-300 text-gray-900'
@@ -234,8 +228,6 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
         posteId: poste.id,
         dureeMinutes: parseInt(duration),
         clientId: selectedClient?.id || null,
-        notes: notes,
-        jeuPrincipal: jeuPrincipal,
         // Paramètres de paiement anticipé
         paiementAnticipe: paiementAnticipe,
         montantPaye: paiementAnticipe ? parseFloat(montantPaye || 0) : 0,
@@ -298,8 +290,6 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
       setMontantPaye('');
       setModePaiement('ESPECES');
       setMarquerCommePayee(false);
-      setJeuPrincipal('');
-      setNotes('');
     }
   }, [isOpen]);
   
@@ -526,32 +516,6 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                     Ce client ne dispose d'aucun abonnement actif
                   </p>
                 )}
-              </div>
-
-              {/* Jeu principal et notes */}
-              <div className={cardClass}>
-                <label className="flex items-center text-sm font-medium mb-2">
-                  <span className="mr-2 text-blue-500">🎮</span>
-                  Jeu principal (optionnel)
-                </label>
-                <input
-                  type="text"
-                  value={jeuPrincipal}
-                  onChange={(e) => setJeuPrincipal(e.target.value)}
-                  placeholder="Ex: Fortnite, FIFA 24..."
-                  className={inputClass}
-                />
-                
-                <label className="flex items-center text-sm font-medium mt-4 mb-2">
-                  <span className="mr-2 text-blue-500">📝</span>
-                  Notes (optionnel)
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Notes sur la session..."
-                  className={textareaClass}
-                ></textarea>
               </div>
             </div>
             
