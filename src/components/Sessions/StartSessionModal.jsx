@@ -326,7 +326,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-6">
               {/* Sélection du client - Colonne gauche */}
-              <div className="bg-gray-50 dark:bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+              <div className="bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                 <label className="flex items-center text-sm font-medium mb-2 dark:text-gray-200">
                   <User className="w-4 h-4 mr-2 text-blue-500" />
                   Client (optionnel)
@@ -437,7 +437,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
               </div>
 
               {/* Type de session - Colonne gauche */}
-              <div className="bg-gray-50 dark:bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+              <div className="bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                 <label className="flex items-center text-sm font-medium mb-2 dark:text-gray-200">
                   <svg className="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -517,7 +517,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
             
             <div className="space-y-6">
               {/* Configuration de la session - Colonne droite */}
-              <div className="bg-gray-50 dark:bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+              <div className="bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                 {/* Durée */}
                 <div className="mb-4">
                   <label className="flex items-center text-sm font-medium mb-2 dark:text-gray-200">
@@ -579,7 +579,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
           {/* Résumé de la session et options de paiement */}
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Résumé et prix - Colonne gauche */}
-            <div className="bg-gray-50 dark:bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
               <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center">
                 <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
@@ -593,7 +593,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                   <span className="ml-3 text-gray-500">Calcul en cours...</span>
                 </div>
               ) : prixCalcule ? (
-                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                <div className="bg-gray-800 p-3 rounded-lg">
                   <ul className="space-y-2 text-sm">
                     <li className="flex justify-between items-center py-1">
                       <span className="text-gray-600 dark:text-gray-300 flex items-center">
@@ -695,7 +695,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
             </div>
             
             {/* Paiement anticipé - Colonne droite */}
-            <div className="bg-gray-50 dark:bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-medium text-gray-900 dark:text-gray-100 flex items-center">
                   <CreditCard className="w-5 h-5 mr-2 text-blue-500" />
@@ -848,7 +848,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="px-6 py-2.5 mr-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center disabled:opacity-50"
+              className="px-6 py-2.5 mr-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:hover:bg-gray-700 transition-colors duration-200 flex items-center disabled:opacity-50"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
