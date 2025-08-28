@@ -281,7 +281,7 @@ const SessionStartForm = ({
                 </div>
 
                 {/* Client */}
-                <div>
+                <div className="bg-white dark:bg-gray-800 p-3 rounded border">
                   <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                     <User className="w-4 h-4 inline mr-2" />
                     Client (optionnel)
@@ -302,7 +302,7 @@ const SessionStartForm = ({
                 </div>
 
                 {/* Jeu principal */}
-                <div>
+                <div className="bg-white dark:bg-gray-800 p-3 rounded border">
                   <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                     🎮 Jeu principal (optionnel)
                   </label>
@@ -316,7 +316,7 @@ const SessionStartForm = ({
                 </div>
 
                 {/* Notes */}
-                <div>
+                <div className="bg-white dark:bg-gray-800 p-3 rounded border">
                   <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                     📝 Notes (optionnel)
                   </label>
@@ -331,10 +331,10 @@ const SessionStartForm = ({
               </div>
 
               {/* Colonne droite - Prix et paiement */}
-              <div className="space-y-6">
+              <div className=" bg-white dark:bg-gray-800 p-3 rounded border space-y-6">
                 
                 {/* Affichage du prix calculé */}
-                <div>
+                <div className="bg-white dark:bg-gray-800 p-3 rounded border">
                   <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                     💰 Estimation du coût
                   </h3>
@@ -382,7 +382,7 @@ const SessionStartForm = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
+                    <div className="bg-white dark:bg-gray-800 p-3 rounded border p-8 border-2 border-dashed border-gray-300 rounded-lg text-center">
                       <Calculator className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                       <p className="text-gray-500">
                         {formData.dureeEstimeeMinutes ? 'Calcul du prix...' : 'Saisissez une durée pour voir le prix'}
@@ -392,7 +392,7 @@ const SessionStartForm = ({
                 </div>
 
                 {/* Paiement anticipé */}
-                <div className="border-t pt-6">
+                <div className="bg-white dark:bg-gray-800 p-3 rounded border border-t pt-6">
                   <div className="flex items-center space-x-3 mb-4">
                     <input
                       type="checkbox"
@@ -419,7 +419,7 @@ const SessionStartForm = ({
                       </div>
 
                       {/* Mode de paiement */}
-                      <div>
+                      <div className="bg-white dark:bg-gray-800 p-3 rounded border">
                         <label className="block text-sm font-medium mb-2 text-green-800 dark:text-green-200">
                           Mode de paiement
                         </label>
