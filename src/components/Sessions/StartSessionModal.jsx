@@ -6,7 +6,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { usePayment } from '../../contexts/PaymentContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import PricingService from '../../services/pricingService';
-import { Star, Clock, CreditCard, DollarSign, Check, AlertCircle, User, MessageSquareText, Gamepad2 } from 'lucide-react';
+import { Star, Clock, CreditCard, DollarSign, Check, AlertCircle, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -24,8 +24,6 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
   const [montantPaye, setMontantPaye] = useState('');
   const [modePaiement, setModePaiement] = useState('ESPECES');
   const [marquerCommePayee, setMarquerCommePayee] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [jeu, setJeu] = useState('');
   
   const { startSession } = useSessionActions();
   const { startSessionWithSubscription } = useStartSessionWithSubscription();
@@ -238,8 +236,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
         posteId: poste.id,
         dureeMinutes: parseInt(duration),
         clientId: selectedClient?.id || null,
-        notes: notes,
-        jeu: jeu,
+        notes: '',
         // Paramètres de paiement anticipé
         paiementAnticipe: paiementAnticipe,
         montantPaye: paiementAnticipe ? parseFloat(montantPaye || 0) : 0,
@@ -302,8 +299,6 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
       setMontantPaye('');
       setModePaiement('ESPECES');
       setMarquerCommePayee(false);
-      setNotes('');
-      setJeu('');
     }
   }, [isOpen]);
   
@@ -311,7 +306,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-6xl">
+      <div className="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-5xl">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -577,37 +572,6 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                     {formattedStartTime}
                   </p>
                 </div>
-              </div>
-
-              <div className="bg-gray-50 dark:bg-gray-750 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                  <div className="mb-4">
-                      <label htmlFor="notes" className="flex items-center text-sm font-medium mb-2 dark:text-gray-200">
-                          <MessageSquareText className="w-4 h-4 mr-2 text-blue-500" />
-                          Notes
-                      </label>
-                      <textarea
-                          id="notes"
-                          rows="2"
-                          className={inputClasses}
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          placeholder="Informations supplémentaires sur la session..."
-                      />
-                  </div>
-                  <div>
-                      <label htmlFor="jeu" className="flex items-center text-sm font-medium mb-2 dark:text-gray-200">
-                          <Gamepad2 className="w-4 h-4 mr-2 text-blue-500" />
-                          Jeu (optionnel)
-                      </label>
-                      <input
-                          id="jeu"
-                          type="text"
-                          className={inputClasses}
-                          value={jeu}
-                          onChange={(e) => setJeu(e.target.value)}
-                          placeholder="Ex: Fortnite, League of Legends..."
-                      />
-                  </div>
               </div>
             </div>
           </div>
