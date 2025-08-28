@@ -322,13 +322,13 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
         
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Colonne gauche - Paramètres principaux */}
+            {/* Colonne gauche - Informations client et durée */}
             <div className="space-y-6">
               <h3 className={`text-lg font-semibold flex items-center gap-2 mb-4 ${
                 isDarkMode ? 'text-blue-300' : 'text-blue-700'
               }`}>
                 <User className="w-5 h-5" />
-                Informations de la session
+                Informations client
               </h3>
 
               {/* Sélection du client */}
@@ -517,21 +517,17 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                   </p>
                 )}
               </div>
-            </div>
-            
-            {/* Colonne droite - Paramètres de durée et paiement */}
-            <div className="space-y-6">
-              <h3 className={`text-lg font-semibold flex items-center gap-2 mb-4 ${
-                isDarkMode ? 'text-blue-300' : 'text-blue-700'
-              }`}>
-                <Clock className="w-5 h-5" />
-                Durée et paiement
-              </h3>
 
               {/* Configuration de la durée */}
               <div className={cardClass}>
-                <label className="flex items-center text-sm font-medium mb-2">
+                <h3 className={`text-sm font-medium flex items-center mb-2 ${
+                  isDarkMode ? 'text-blue-300' : 'text-blue-700'
+                }`}>
                   <Clock className="w-4 h-4 mr-2 text-blue-500" />
+                  Durée et heure de début
+                </h3>
+                
+                <label className="block text-sm font-medium mb-2">
                   Durée (minutes)
                 </label>
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -558,8 +554,8 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                 </div>
                 
                 {/* Heure de début */}
-                <label className="flex items-center text-sm font-medium mb-2">
-                  <Calendar className="w-4 h-4 mr-2 text-blue-500" />
+                <label className="block text-sm font-medium mb-2">
+                  <Calendar className="w-4 h-4 mr-2 text-blue-500 inline-block" />
                   Heure de début
                 </label>
                 <input
@@ -572,11 +568,21 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                   {formattedStartTime}
                 </p>
               </div>
+            </div>
+            
+            {/* Colonne droite - Tarification et paiement */}
+            <div className="space-y-6">
+              <h3 className={`text-lg font-semibold flex items-center gap-2 mb-4 ${
+                isDarkMode ? 'text-blue-300' : 'text-blue-700'
+              }`}>
+                <Calculator className="w-5 h-5" />
+                Tarification et paiement
+              </h3>
 
               {/* Résumé et prix */}
               <div className={cardClass}>
                 <h3 className="font-medium mb-3 flex items-center">
-                  <Calculator className="w-5 h-5 mr-2 text-blue-500" />
+                  <Calculator className="w-4 h-4 mr-2 text-blue-500" />
                   Estimation du coût
                 </h3>
                 
@@ -662,7 +668,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
               <div className={cardClass}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-medium flex items-center">
-                    <CreditCard className="w-5 h-5 mr-2 text-blue-500" />
+                    <CreditCard className="w-4 h-4 mr-2 text-blue-500" />
                     Options de paiement
                   </h3>
                   
@@ -783,7 +789,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                     </div>
                   </div>
                 ) : prixCalcule ? (
-                  <div className="flex flex-col items-center justify-center h-48 text-center p-4">
+                  <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-4">
                     <div className={`p-3 rounded-full mb-3 ${
                       isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
                     }`}>
@@ -799,7 +805,7 @@ const StartSessionModal = ({ isOpen, onClose, poste, onSessionStarted }) => {
                     </p>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-48 text-center p-4">
+                  <div className="flex flex-col items-center justify-center min-h-[300px] text-center p-4">
                     <div className={`p-3 rounded-full mb-3 animate-pulse ${
                       isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
                     }`}>
