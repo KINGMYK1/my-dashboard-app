@@ -5,9 +5,16 @@ import { Card, CardHeader, CardContent } from '../../components/ui';
 
 const StatistiquesTransactions = () => {
   const { effectiveTheme } = useTheme();
+  const getAnneeActuelleFiltres = () => {
+    const anneeActuelle = new Date().getFullYear();
+    const dateDebut = new Date(anneeActuelle, 0, 1).toISOString().split('T')[0];
+    const dateFin = new Date(anneeActuelle, 11, 31).toISOString().split('T')[0];
+    return { dateDebut, dateFin };
+  };
+
   const [filtres, setFiltres] = useState({
-    dateDebut: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    dateFin: new Date().toISOString().split('T')[0],
+    dateDebut: getAnneeActuelleFiltres().dateDebut,
+    dateFin: getAnneeActuelleFiltres().dateFin,
     groupBy: 'day'
   });
 
