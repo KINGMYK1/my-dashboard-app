@@ -145,7 +145,7 @@ const Sidebar = ({ expanded, toggleSidebar, isMobile }) => {
         {
           icon: <DollarSign size={18} />,
           label: translations.transactionStats || 'Statistiques Transactions',
-          path: '/dashboard/statistiques/transactions',
+          path: '/dashboard/statistiques-transactions',
           permission: 'SESSIONS_VIEW'
         }
       ]
